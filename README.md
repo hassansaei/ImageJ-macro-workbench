@@ -1,7 +1,6 @@
-# ImageJ-macro-workbench
-## ND2/TIFF Image Analyzer (Fiji Macros)
+## ImageJ-macro-workbench
 
-I maintain a set of ImageJ/Fiji macros that automate DAPI and multichannel exports from Nikon ND2 or TIFF acquisitions for reproducibility. Each script supports one to four fluorescence channels and produces publication-ready JPEG outputs and figure panels.
+ND2/TIFF Image Analyzer (Fiji Macros): I maintain a set of ImageJ/Fiji macros that automate DAPI and multichannel exports from Nikon ND2 or TIFF acquisitions for reproducibility. Each script supports one to four fluorescence channels and produces publication-ready JPEG outputs and figure panels.
 
 ### Repository Contents
 - `0_NikonAx_ImageAnalyzer_4Channels_v1.ijm` → My foundational pipeline that generates DAPI-only, DAPI+channel, full-merge, and composite panel outputs.
