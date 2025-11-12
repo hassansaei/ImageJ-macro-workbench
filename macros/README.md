@@ -70,11 +70,87 @@ I developed the `0_NikonAx_ImageAnalyzer_4Channels` macro series to streamline f
 
 ---
 
-### Summary Timeline
-- **v1**: Established the batch exporter with global contrast options and panel assembly.
-- **v2**: Added per-channel intensity control and thicker borders via line-width tweaks.
-- **v3**: Replaced line-width borders with a fill-based helper for consistent appearance.
-- **v4**: Locked in explicit colour mapping, robust ≤4-channel handling, and comprehensive run logging.
+### V5 introduces **user-defined color assignment** for all channels, adds **CZI file format support**, and includes significant improvements to color handling and merge logic.
+
+### 1. User-Defined Channel Color Assignment
+- **New dialog options** for selecting colors for each channel (C1/DAPI, C2, C3, C4)
+- **Available color options**: Red, Green, Blue, Gray, Cyan, Magenta, Yellow, or None
+- Colors are applied consistently across:
+  - Individual DAPI+channel composites
+  - Final multi-channel merge
+- **Default colors** (maintained for backward compatibility):
+  - C1 (DAPI): Blue
+  - C2: Green
+  - C3: Red
+  - C4: Gray
+
+### 2. CZI File Format Support
+- Added support for **Zeiss CZI files** in addition to ND2 and TIFF
+- Updated file detection logic to recognize `.czi` extension
+- Updated dialog prompt to mention CZI support
+
+### 3. Enhanced Color Handling
+- **Bio-Formats import mode changed** from `color_mode=Composite` to `color_mode=Colorized` to preserve original LUT colors from file metadata
+- **Automatic LUT removal**: All split channels are converted to grayscale to allow custom color assignment
+- **Composite color support**: Handles Cyan (Green+Blue), Magenta (Red+Blue), and Yellow (Red+Green) by duplicating channels as needed
+
+## Technical Changes
+
+### New Helper Functions
+1. **`getChannelColor(channelIndex, c2Color, c3Color, c4Color)`**
+   - Returns the user-selected color for a specific channel index
+
+2. **`getColorChannelMapping(colorName)`**
+   - Maps color names to ImageJ merge channel specifications (c1=red, c2=green, c3=blue, c4=gray)
+
+3. **`getTwoChannelMergeSpecSimple(channelIndex, dapiTitle, channelTitle, dapiColor, channelColor)`**
+   - Replaces the old `getTwoChannelMergeSpec()` function
+   - Builds merge specifications based on user-defined colors
+   - Handles composite colors (Cyan, Magenta, Yellow) by creating channel duplicates
+
+### Removed Functions
+- **`getTwoChannelMergeSpec()`** - Replaced by `getTwoChannelMergeSpecSimple()`
+- **`addChannelToMergeArgs()`** - Replaced by new color-based merge logic
+
+### Modified Merge Logic
+- **Final merge** now uses a sophisticated color assignment system:
+  - Tracks which images are assigned to each RGB channel (Red, Green, Blue, Gray)
+  - Combines multiple channels assigned to the same color using Image Calculator
+  - Handles conflicts when multiple channels use the same color
+  - Supports composite colors (Cyan, Magenta, Yellow) through channel duplication
+
+### Bug Fixes
+- **Fixed variable name conflict**: Changed inner loop variable from `i` to `j` in Image Calculator combination loops (lines 367, 391, 415, 439) to prevent breaking the outer file iteration loop
+
+### Log File Changes
+- **Log filename changed** from `ND2_ImageAnalyzer_Log.txt` to `ImageAnalyzer_Log.txt` (more generic, reflects multi-format support)
+- **Log now includes** channel color assignments in the settings section
+
+## Code Statistics
+- **Total lines**: ~758 (v5) vs ~396 (v4)
+- **New functions**: 3
+- **Removed functions**: 2
+- **Modified core logic**: Merge operations completely rewritten
+
+## Backward Compatibility
+- **Default colors match v4 behavior**: Blue DAPI, Green C2, Red C3, Gray C4
+- **All v4 features preserved**: Enhance contrast, fixed ranges, per-channel ranges, scale bars, panel generation
+- **File processing workflow unchanged**: Same output file naming and structure
+
+## Migration Notes
+- Users can continue using v5 with default colors for v4-like behavior
+- Custom color assignments provide flexibility for different imaging conventions
+- CZI support expands compatibility with Zeiss microscopy systems
+- The new color system requires more processing time for composite colors (Cyan, Magenta, Yellow) due to channel duplication
+
+## Usage Example
+To use custom colors in v5:
+1. Run the macro
+2. In the Settings dialog, scroll to "Channel Color Assignment"
+3. Select desired colors for each channel (C1/DAPI, C2, C3, C4)
+4. Process files as usual
+
+The selected colors will be consistently applied to all output images.
 
 I use this report as my authoritative reference for communicating release notes and choosing the appropriate macro version for a given dataset.
 
