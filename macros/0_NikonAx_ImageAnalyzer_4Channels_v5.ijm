@@ -128,7 +128,7 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
         orig = getTitle();
         Stack.setDisplayMode("composite");
         Stack.getDimensions(w,h,C,Z,T);
-        if (C < 1) { if (isOpen(orig)) {selectWindow(orig); close();} continue; }
+        if (C < 1) { safeClose(orig); continue; }
         // Limit to DAPI + 3 channels (C2..C4)
         maxChannel = C;
         if (maxChannel > 4) maxChannel = 4;
@@ -178,7 +178,7 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
             print("No C1 (DAPI) found; skipping file.");
             logText = logText + "    Skipped: no C1 (DAPI) channel detected.\n";
             run("Close All");
-            if (isOpen(orig)) { selectWindow(orig); close(); }
+            safeClose(orig);
             continue;
         }
         // clean 8-bit DAPI temp for merging
@@ -225,13 +225,7 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
             logText = logText + "    Saved DAPI + C" + c + ": " + folder + base + "__DAPI_plus_C" + c + ".jpg\n";
             close(); // merged RGB
             // Cleanup temp channels
-            if (isOpen("__TMP_CH")) { selectWindow("__TMP_CH"); close(); }
-            if (isOpen("__TMP_CH_R")) { selectWindow("__TMP_CH_R"); close(); }
-            if (isOpen("__TMP_CH_G")) { selectWindow("__TMP_CH_G"); close(); }
-            if (isOpen("__TMP_CH_B")) { selectWindow("__TMP_CH_B"); close(); }
-            if (isOpen("__TMP_DAPI_R")) { selectWindow("__TMP_DAPI_R"); close(); }
-            if (isOpen("__TMP_DAPI_G")) { selectWindow("__TMP_DAPI_G"); close(); }
-            if (isOpen("__TMP_DAPI_B")) { selectWindow("__TMP_DAPI_B"); close(); }
+            cleanupTempWindows("__TMP_CH,__TMP_CH_R,__TMP_CH_G,__TMP_CH_B,__TMP_DAPI_R,__TMP_DAPI_G,__TMP_DAPI_B");
         }
 
         // Final merged image: DAPI + up to 3 other channels
@@ -366,7 +360,7 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
                     run("Duplicate...", "title=" + combinedName);
                     for (j = 1; j < c1Parts.length; j++) {
                         run("Image Calculator...", "image1=[" + combinedName + "] operation=Add image2=[" + c1Parts[j] + "] create 32-bit");
-                        if (isOpen(combinedName)) { selectWindow(combinedName); close(); }
+                        safeClose(combinedName);
                         selectWindow("Result of " + combinedName);
                         run("Rename...", "title=" + combinedName);
                     }
@@ -390,7 +384,7 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
                     run("Duplicate...", "title=" + combinedName);
                     for (j = 1; j < c2Parts.length; j++) {
                         run("Image Calculator...", "image1=[" + combinedName + "] operation=Add image2=[" + c2Parts[j] + "] create 32-bit");
-                        if (isOpen(combinedName)) { selectWindow(combinedName); close(); }
+                        safeClose(combinedName);
                         selectWindow("Result of " + combinedName);
                         run("Rename...", "title=" + combinedName);
                     }
@@ -414,7 +408,7 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
                     run("Duplicate...", "title=" + combinedName);
                     for (j = 1; j < c3Parts.length; j++) {
                         run("Image Calculator...", "image1=[" + combinedName + "] operation=Add image2=[" + c3Parts[j] + "] create 32-bit");
-                        if (isOpen(combinedName)) { selectWindow(combinedName); close(); }
+                        safeClose(combinedName);
                         selectWindow("Result of " + combinedName);
                         run("Rename...", "title=" + combinedName);
                     }
@@ -438,7 +432,7 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
                     run("Duplicate...", "title=" + combinedName);
                     for (j = 1; j < c4Parts.length; j++) {
                         run("Image Calculator...", "image1=[" + combinedName + "] operation=Add image2=[" + c4Parts[j] + "] create 32-bit");
-                        if (isOpen(combinedName)) { selectWindow(combinedName); close(); }
+                        safeClose(combinedName);
                         selectWindow("Result of " + combinedName);
                         run("Rename...", "title=" + combinedName);
                     }
@@ -465,20 +459,10 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
             close(); // merged RGB
 
             // Cleanup temps for merge
-            if (isOpen("__TMP_DAPI")) { selectWindow("__TMP_DAPI"); close(); }
-            if (isOpen("__TMP_DAPI_R")) { selectWindow("__TMP_DAPI_R"); close(); }
-            if (isOpen("__TMP_DAPI_G")) { selectWindow("__TMP_DAPI_G"); close(); }
-            if (isOpen("__TMP_DAPI_B")) { selectWindow("__TMP_DAPI_B"); close(); }
-            if (isOpen("__TMP_RED_COMBINED")) { selectWindow("__TMP_RED_COMBINED"); close(); }
-            if (isOpen("__TMP_GREEN_COMBINED")) { selectWindow("__TMP_GREEN_COMBINED"); close(); }
-            if (isOpen("__TMP_BLUE_COMBINED")) { selectWindow("__TMP_BLUE_COMBINED"); close(); }
-            if (isOpen("__TMP_GRAY_COMBINED")) { selectWindow("__TMP_GRAY_COMBINED"); close(); }
+            cleanupTempWindows("__TMP_DAPI,__TMP_DAPI_R,__TMP_DAPI_G,__TMP_DAPI_B,__TMP_RED_COMBINED,__TMP_GREEN_COMBINED,__TMP_BLUE_COMBINED,__TMP_GRAY_COMBINED");
             for (k=2; k<=maxChannel; k++) {
                 tname = "__TMP_C" + k;
-                if (isOpen(tname)) { selectWindow(tname); close(); }
-                if (isOpen(tname + "_R")) { selectWindow(tname + "_R"); close(); }
-                if (isOpen(tname + "_G")) { selectWindow(tname + "_G"); close(); }
-                if (isOpen(tname + "_B")) { selectWindow(tname + "_B"); close(); }
+                cleanupTempWindows(tname + "," + tname + "_R," + tname + "_G," + tname + "_B");
             }
         }
 
@@ -558,7 +542,7 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
 
         // Close everything from this file before next
         run("Close All");
-        if (isOpen(orig)) { selectWindow(orig); close(); }
+        safeClose(orig);
 
         print("Saved: " + base + " (DAPI, DAPI+channels, final merge)");
         logText = logText + "    Status: completed\n";
@@ -636,6 +620,38 @@ function getColorChannelMapping(colorName) {
     if (colorName == "Yellow") return "c1= c2=";  // Red + Green
     if (colorName == "None") return "";
     return "";  // Default: no mapping
+}
+
+// --- helper: safely close a window if it exists ---
+function safeClose(windowName) {
+    if (isOpen(windowName)) {
+        selectWindow(windowName);
+        close();
+    }
+}
+
+// --- helper: cleanup multiple temporary windows from comma-separated list ---
+function cleanupTempWindows(windowNames) {
+    if (windowNames == "") return;
+    names = split(windowNames, ",");
+    for (i = 0; i < names.length; i++) {
+        safeClose(trim(names[i]));
+    }
+}
+
+// --- helper: trim whitespace from string (simple implementation) ---
+function trim(str) {
+    // Remove leading spaces
+    while (lengthOf(str) > 0 && substring(str, 0, 1) == " ") {
+        str = substring(str, 1);
+    }
+    // Remove trailing spaces
+    len = lengthOf(str);
+    while (len > 0 && substring(str, len - 1, len) == " ") {
+        str = substring(str, 0, len - 1);
+        len = lengthOf(str);
+    }
+    return str;
 }
 
 // --- helper: merge spec for DAPI + single channel using user-defined colors ---
