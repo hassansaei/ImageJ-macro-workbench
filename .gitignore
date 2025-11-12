@@ -1,0 +1,22 @@
+# Test folder
+test/
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ImageJ/Fiji
+*.log
+*.txt
+!README.md
+!macros/README.md
+
+# Temporary files
+*.tmp
+*~
+
