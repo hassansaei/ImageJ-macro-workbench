@@ -1,17 +1,18 @@
 ## ImageJ-macro-workbench
 
-ND2/TIFF Image Analyzer (Fiji Macros): I maintain a set of ImageJ/Fiji macros that automate DAPI and multichannel exports from Nikon ND2 or TIFF acquisitions for reproducibility. Each script supports one to four fluorescence channels and produces publication-ready JPEG outputs and figure panels.
+ND2/CZI/TIFF Image Analyzer (Fiji Macros): I maintain a set of ImageJ/Fiji macros that automate DAPI and multichannel exports from ND2, CZI, and TIFF acquisitions for reproducibility. Each script supports one to four fluorescence channels and produces publication-ready JPEG outputs and figure panels.
 
 ### Repository Contents
 - `0_NikonAx_ImageAnalyzer_4Channels_v1.ijm` → My foundational pipeline that generates DAPI-only, DAPI+channel, full-merge, and composite panel outputs.
 - `0_NikonAx_ImageAnalyzer_4Channels_v2.ijm` → Adds optional per-channel intensity ranges and thicker panel borders.
 - `0_NikonAx_ImageAnalyzer_4Channels_v3.ijm` → Replaces border drawing with a deterministic fill-based helper.
 - `0_NikonAx_ImageAnalyzer_4Channels_v4.ijm` → Locks in colour mapping, handles three-channel datasets seamlessly, and writes a processing log.
-- `ND2_ImageAnalyzer_Version_Report.md` → My detailed comparison of all releases.
+- `0_NikonAx_ImageAnalyzer_4Channels_v5.ijm` → Adds user-defined color assignment, CZI support, C1 intensity control, customizable panel layouts, and centralized cleanup routines.
+- `macros/README.md` → My detailed comparison of all releases.
 
 ### Requirements
 - Fiji (ImageJ) distribution with the **Bio-Formats** plugin.
-- ND2 or TIFF files exported from Nikon AX (or any compatible acquisition).
+- ND2, CZI, or TIFF files from compatible microscopy systems (Nikon, Zeiss, or other formats supported by Bio-Formats).
 
 ### Installation
 1. Download or clone this repository.
@@ -19,25 +20,28 @@ ND2/TIFF Image Analyzer (Fiji Macros): I maintain a set of ImageJ/Fiji macros th
 3. Launch Fiji, go to `Plugins → Macros → Run...`, and select the macro.
 
 ### Usage Overview
-1. Run the macro and choose the folder containing ND2/TIFF files.
+1. Run the macro and choose the folder containing ND2, CZI, or TIFF files.
 2. Configure the dialog options I expose:
    - Enhance contrast (global or per-channel saturation).
-   - Global or per-channel fixed intensity ranges; optional LUT baking.
+   - Global or per-channel fixed intensity ranges (C1-C4); optional LUT baking.
    - Scale-bar length, font size, and thickness.
+   - User-defined color assignment for each channel (v5+).
+   - Panel layout selection to choose which image appears larger (v5+).
 3. The macro processes each file and writes JPEG outputs beside the source data:
    - `__DAPI.jpg`
    - `__DAPI_plus_Cn.jpg` for each detected channel (up to C4)
    - `__MERGE_DAPI_C2_C3_...jpg`
-   - `__PANEL_LEFT3_PLUS_MERGE.jpg`
-4. In v4, I also drop a log file (`ND2_ImageAnalyzer_Log.txt`) summarising the settings and results.
+   - `__PANEL.jpg` (v5+) or `__PANEL_LEFT3_PLUS_MERGE.jpg` (v1-v4)
+4. A log file (`ImageAnalyzer_Log.txt` in v5+, `ND2_ImageAnalyzer_Log.txt` in v4) summarises the settings and results.
 
 ### Choosing a Version
 - **v1**: My quickstart option with global contrast control only.
 - **v2**: Ideal when individual fluorophores need custom display ranges.
 - **v3**: Best when I need perfectly consistent panel borders for figures.
-- **v4** *(latest)*: My default choice for colour fidelity, three-channel robustness, and audit logging.
+- **v4**: My default choice for colour fidelity, three-channel robustness, and audit logging.
+- **v5** *(latest)*: Recommended for flexible color assignment, CZI support, C1 intensity control, customizable panel layouts, and improved code maintainability.
 
-See `ND2_ImageAnalyzer_Version_Report.md` for the full changelog and technical notes.
+See `macros/README.md` for the full changelog and technical notes.
 
 ### Contributing
 I welcome pull requests and issue reports. Please include:
