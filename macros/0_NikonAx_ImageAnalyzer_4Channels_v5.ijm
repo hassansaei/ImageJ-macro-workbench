@@ -8,23 +8,19 @@
 //  - A DAPI-only image with a scale bar.
 //  - DAPI + up to three other channels (C2–C4) composites, each saved.
 //  - A final merged image (DAPI plus up to C2–C4), saved.
-//  - A panel combining up to three DAPI+channel composites stacked on the left
-//    and the large merged image on the right, with thin white borders.
-// Update (v5):
-//  - User-defined color assignment for each channel (C1/DAPI, C2, C3, C4)
-//  - Colors can be chosen from: Red, Green, Blue, Gray, Cyan, Magenta, Yellow, or None
-//  - Custom colors are applied consistently across all merge operations
-// Update (v4):
-//  - Automatically adapts to three-channel acquisitions (C1/DAPI blue,
-//    C2 green, C3 red) without requiring a dummy fourth channel.
-//  - Ensures consistent colour mapping across DAPI+channel composites
-//    and the final merge (blue nuclei, green C2, red C3, optional fourth
-//    channel reserved for far-red/gray).
+//  - A panel combining DAPI+channel composites with user-selectable larger image
+//    (smaller images stacked on left, selected larger image on right), with white borders.
 // Options:
-//  - Optional Enhance Contrast (saturation percent) for autoscaling.
-//  - Optional fixed display range via setMinAndMax (with optional Apply LUT
-//    to bake scaling into pixels).
-//  - Scale bar length, font size, and thickness are configurable.
+//  - File format support: ND2 (Nikon), CZI (Zeiss), and TIFF files
+//  - Optional Enhance Contrast (saturation percent) for autoscaling
+//  - Optional fixed display range via setMinAndMax (global or per-channel for C1-C4)
+//    with optional Apply LUT to bake scaling into pixels
+//  - Per-channel intensity control: independent min/max ranges for C1 (DAPI), C2, C3, and C4
+//  - Scale bar: configurable length (µm), font size, and thickness (px)
+//  - User-defined color assignment for each channel (C1/DAPI, C2, C3, C4):
+//    choose from Red, Green, Blue, Gray, Cyan, Magenta, Yellow, or None
+//  - Panel layout: select which image appears larger (Merged, DAPI+C2, DAPI+C3, or DAPI+C4)
+//  - Automatic logging: processing details saved to ImageAnalyzer_Log.txt
 // ------------------------------------------------------------
 
 macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILES (v5)" {
@@ -42,8 +38,10 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
     Dialog.addNumber("Fixed min intensity", 50);
     Dialog.addNumber("Fixed max intensity", 3000);
     Dialog.addCheckbox("Apply LUT (bake scaling into pixels)", false);
-    // Optional per-channel fixed ranges for C2–C4
-    Dialog.addCheckbox("Use per-channel fixed ranges for C2–C4", false);
+    // Optional per-channel fixed ranges for C1–C4
+    Dialog.addCheckbox("Use per-channel fixed ranges for C1–C4", false);
+    Dialog.addNumber("C1 (DAPI) min intensity", 50);
+    Dialog.addNumber("C1 (DAPI) max intensity", 3000);
     Dialog.addNumber("C2 min intensity", 50);
     Dialog.addNumber("C2 max intensity", 3000);
     Dialog.addNumber("C3 min intensity", 50);
@@ -56,6 +54,8 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
     Dialog.addChoice("C2 color:", newArray("Green", "Red", "Blue", "Gray", "Cyan", "Magenta", "Yellow", "None"), "Green");
     Dialog.addChoice("C3 color:", newArray("Red", "Green", "Blue", "Gray", "Cyan", "Magenta", "Yellow", "None"), "Red");
     Dialog.addChoice("C4 color:", newArray("Gray", "Red", "Green", "Blue", "Cyan", "Magenta", "Yellow", "None"), "Gray");
+    Dialog.addMessage("--- Panel Layout ---");
+    Dialog.addChoice("Larger panel image:", newArray("Merged", "DAPI+C2", "DAPI+C3", "DAPI+C4"), "Merged");
     Dialog.show();
     satPct  = Dialog.getNumber();
     doEnhance = Dialog.getCheckbox();
@@ -67,6 +67,8 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
     fixedMax = Dialog.getNumber();
     applyLUT = Dialog.getCheckbox();
     useFixedPer = Dialog.getCheckbox();
+    c1Min = Dialog.getNumber();
+    c1Max = Dialog.getNumber();
     c2Min = Dialog.getNumber();
     c2Max = Dialog.getNumber();
     c3Min = Dialog.getNumber();
@@ -78,6 +80,7 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
     c2Color = Dialog.getChoice();
     c3Color = Dialog.getChoice();
     c4Color = Dialog.getChoice();
+    panelLargerImage = Dialog.getChoice();
     
     // Debug: Print selected colors
     print("Selected colors - C1: " + c1Color + ", C2: " + c2Color + ", C3: " + c3Color + ", C4: " + c4Color);
@@ -97,10 +100,12 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
     logText = logText + "Fixed max intensity: " + fixedMax + "\n";
     logText = logText + "Apply LUT: " + boolToString(applyLUT) + "\n";
     logText = logText + "Use per-channel fixed ranges: " + boolToString(useFixedPer) + "\n";
+    logText = logText + "C1 (DAPI) min/max: " + c1Min + " / " + c1Max + "\n";
     logText = logText + "C2 min/max: " + c2Min + " / " + c2Max + "\n";
     logText = logText + "C3 min/max: " + c3Min + " / " + c3Max + "\n";
     logText = logText + "C4 min/max: " + c4Min + " / " + c4Max + "\n";
     logText = logText + "Channel colors - C1: " + c1Color + ", C2: " + c2Color + ", C3: " + c3Color + ", C4: " + c4Color + "\n";
+    logText = logText + "Panel larger image: " + panelLargerImage + "\n";
     logText = logText + "\nProcessed files:\n";
     processedCount = 0;
 
@@ -110,6 +115,7 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
 
     for (i=0; i<files.length; i++) {
         mergeSavePath = "";
+        dapiAlonePath = "";
         file = files[i];
         fLower = toLowerCase(file);
         isND2 = endsWith(fLower, ".nd2");
@@ -128,7 +134,7 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
         orig = getTitle();
         Stack.setDisplayMode("composite");
         Stack.getDimensions(w,h,C,Z,T);
-        if (C < 1) { if (isOpen(orig)) {selectWindow(orig); close();} continue; }
+        if (C < 1) { safeClose(orig); continue; }
         // Limit to DAPI + 3 channels (C2..C4)
         maxChannel = C;
         if (maxChannel > 4) maxChannel = 4;
@@ -147,11 +153,12 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
                 run("Apply LUT");
             }
         } else if (useFixedPer) {
-            // Apply per-channel fixed ranges for C2–C4 before splitting
+            // Apply per-channel fixed ranges for C1–C4 before splitting
             Stack.setDisplayMode("composite");
             for (cc=1; cc<=C; cc++) {
                 Stack.setChannel(cc);
-                if (cc==2) setMinAndMax(c2Min, c2Max);
+                if (cc==1) setMinAndMax(c1Min, c1Max);
+                else if (cc==2) setMinAndMax(c2Min, c2Max);
                 else if (cc==3) setMinAndMax(c3Min, c3Max);
                 else if (cc==4) setMinAndMax(c4Min, c4Max);
             }
@@ -178,7 +185,7 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
             print("No C1 (DAPI) found; skipping file.");
             logText = logText + "    Skipped: no C1 (DAPI) channel detected.\n";
             run("Close All");
-            if (isOpen(orig)) { selectWindow(orig); close(); }
+            safeClose(orig);
             continue;
         }
         // clean 8-bit DAPI temp for merging
@@ -195,8 +202,9 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
         run("Duplicate...", "title=__TMP_DAPI_SAVE");
         selectWindow("__TMP_DAPI_SAVE");
         run("Scale Bar...", "width=" + sbLen + " height=" + sbThick + " font=" + sbFont + " color=White background=None location=[Lower Right] bold overlay");
-        saveAs("Jpeg", folder + base + "__DAPI.jpg");
-        logText = logText + "    Saved DAPI image: " + folder + base + "__DAPI.jpg\n";
+        dapiAlonePath = folder + base + "__DAPI.jpg";
+        saveAs("Jpeg", dapiAlonePath);
+        logText = logText + "    Saved DAPI image: " + dapiAlonePath + "\n";
         close(); // __TMP_DAPI_SAVE
 
         // DAPI + each other channel (C2..C4)
@@ -225,13 +233,7 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
             logText = logText + "    Saved DAPI + C" + c + ": " + folder + base + "__DAPI_plus_C" + c + ".jpg\n";
             close(); // merged RGB
             // Cleanup temp channels
-            if (isOpen("__TMP_CH")) { selectWindow("__TMP_CH"); close(); }
-            if (isOpen("__TMP_CH_R")) { selectWindow("__TMP_CH_R"); close(); }
-            if (isOpen("__TMP_CH_G")) { selectWindow("__TMP_CH_G"); close(); }
-            if (isOpen("__TMP_CH_B")) { selectWindow("__TMP_CH_B"); close(); }
-            if (isOpen("__TMP_DAPI_R")) { selectWindow("__TMP_DAPI_R"); close(); }
-            if (isOpen("__TMP_DAPI_G")) { selectWindow("__TMP_DAPI_G"); close(); }
-            if (isOpen("__TMP_DAPI_B")) { selectWindow("__TMP_DAPI_B"); close(); }
+            cleanupTempWindows("__TMP_CH,__TMP_CH_R,__TMP_CH_G,__TMP_CH_B,__TMP_DAPI_R,__TMP_DAPI_G,__TMP_DAPI_B");
         }
 
         // Final merged image: DAPI + up to 3 other channels
@@ -366,7 +368,7 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
                     run("Duplicate...", "title=" + combinedName);
                     for (j = 1; j < c1Parts.length; j++) {
                         run("Image Calculator...", "image1=[" + combinedName + "] operation=Add image2=[" + c1Parts[j] + "] create 32-bit");
-                        if (isOpen(combinedName)) { selectWindow(combinedName); close(); }
+                        safeClose(combinedName);
                         selectWindow("Result of " + combinedName);
                         run("Rename...", "title=" + combinedName);
                     }
@@ -390,7 +392,7 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
                     run("Duplicate...", "title=" + combinedName);
                     for (j = 1; j < c2Parts.length; j++) {
                         run("Image Calculator...", "image1=[" + combinedName + "] operation=Add image2=[" + c2Parts[j] + "] create 32-bit");
-                        if (isOpen(combinedName)) { selectWindow(combinedName); close(); }
+                        safeClose(combinedName);
                         selectWindow("Result of " + combinedName);
                         run("Rename...", "title=" + combinedName);
                     }
@@ -414,7 +416,7 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
                     run("Duplicate...", "title=" + combinedName);
                     for (j = 1; j < c3Parts.length; j++) {
                         run("Image Calculator...", "image1=[" + combinedName + "] operation=Add image2=[" + c3Parts[j] + "] create 32-bit");
-                        if (isOpen(combinedName)) { selectWindow(combinedName); close(); }
+                        safeClose(combinedName);
                         selectWindow("Result of " + combinedName);
                         run("Rename...", "title=" + combinedName);
                     }
@@ -438,7 +440,7 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
                     run("Duplicate...", "title=" + combinedName);
                     for (j = 1; j < c4Parts.length; j++) {
                         run("Image Calculator...", "image1=[" + combinedName + "] operation=Add image2=[" + c4Parts[j] + "] create 32-bit");
-                        if (isOpen(combinedName)) { selectWindow(combinedName); close(); }
+                        safeClose(combinedName);
                         selectWindow("Result of " + combinedName);
                         run("Rename...", "title=" + combinedName);
                     }
@@ -465,100 +467,114 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
             close(); // merged RGB
 
             // Cleanup temps for merge
-            if (isOpen("__TMP_DAPI")) { selectWindow("__TMP_DAPI"); close(); }
-            if (isOpen("__TMP_DAPI_R")) { selectWindow("__TMP_DAPI_R"); close(); }
-            if (isOpen("__TMP_DAPI_G")) { selectWindow("__TMP_DAPI_G"); close(); }
-            if (isOpen("__TMP_DAPI_B")) { selectWindow("__TMP_DAPI_B"); close(); }
-            if (isOpen("__TMP_RED_COMBINED")) { selectWindow("__TMP_RED_COMBINED"); close(); }
-            if (isOpen("__TMP_GREEN_COMBINED")) { selectWindow("__TMP_GREEN_COMBINED"); close(); }
-            if (isOpen("__TMP_BLUE_COMBINED")) { selectWindow("__TMP_BLUE_COMBINED"); close(); }
-            if (isOpen("__TMP_GRAY_COMBINED")) { selectWindow("__TMP_GRAY_COMBINED"); close(); }
+            cleanupTempWindows("__TMP_DAPI,__TMP_DAPI_R,__TMP_DAPI_G,__TMP_DAPI_B,__TMP_RED_COMBINED,__TMP_GREEN_COMBINED,__TMP_BLUE_COMBINED,__TMP_GRAY_COMBINED");
             for (k=2; k<=maxChannel; k++) {
                 tname = "__TMP_C" + k;
-                if (isOpen(tname)) { selectWindow(tname); close(); }
-                if (isOpen(tname + "_R")) { selectWindow(tname + "_R"); close(); }
-                if (isOpen(tname + "_G")) { selectWindow(tname + "_G"); close(); }
-                if (isOpen(tname + "_B")) { selectWindow(tname + "_B"); close(); }
+                cleanupTempWindows(tname + "," + tname + "_R," + tname + "_G," + tname + "_B");
             }
         }
 
-        // Create panel: up to three DAPI+channel composites on left, big merged on right
-        // Determine how many small panels exist (C2..C4)
-        nSmall = 0;
-        for (pc=2; pc<=maxChannel; pc++) {
-            if (nSmall >= 3) break;
-            ppath = folder + base + "__DAPI_plus_C" + pc + ".jpg";
-            if (File.exists(ppath)) nSmall++;
+        // Create panel with user-selected larger image
+        // Determine which image should be larger and collect smaller images
+        largerImagePath = "";
+        smallerImagePaths = newArray("");
+        smallerCount = 0;
+        
+        // Determine the larger image path based on user choice
+        if (panelLargerImage == "Merged" && mergeSavePath != "") {
+            largerImagePath = mergeSavePath;
+        } else if (panelLargerImage == "DAPI+C2") {
+            largerImagePath = folder + base + "__DAPI_plus_C2.jpg";
+        } else if (panelLargerImage == "DAPI+C3") {
+            largerImagePath = folder + base + "__DAPI_plus_C3.jpg";
+        } else if (panelLargerImage == "DAPI+C4") {
+            largerImagePath = folder + base + "__DAPI_plus_C4.jpg";
         }
-        if (nSmall > 0 && mergeSavePath != "") {
-            // Find first existing small image to get dimensions
-            firstPath = "";
-            for (pc=2; pc<=maxChannel; pc++) {
-                ppath = folder + base + "__DAPI_plus_C" + pc + ".jpg";
-                if (File.exists(ppath)) { firstPath = ppath; break; }
+        
+        // Collect smaller images (all available DAPI+channel composites except the larger one)
+        for (pc=2; pc<=maxChannel; pc++) {
+            if (smallerCount >= 3) break;
+            ppath = folder + base + "__DAPI_plus_C" + pc + ".jpg";
+            if (File.exists(ppath) && ppath != largerImagePath) {
+                smallerImagePaths[smallerCount] = ppath;
+                smallerCount++;
             }
-            if (firstPath != "") {
-                open(firstPath);
-                sW = getWidth(); sH = getHeight();
-                close();
-                panelH = nSmall * sH;
-                // Prepare merged image resized to panel height
-                open(mergeSavePath);
-                run("Size...", "height=" + panelH + " constrain average interpolation=Bilinear");
-                mW = getWidth();
-                mergedTitle = getTitle();
-                // Create panel canvas
-                newImage("PANEL_"+base, "RGB black", sW + mW, panelH, 1);
-                panelTitle = getTitle();
-                // Prepare border style (thick white lines)
-                setForegroundColor(255,255,255);
-                borderWidth = 20;
-                // Paste small panels stacked on left
-                yoff = 0;
-                placed = 0;
-                for (pc=2; pc<=maxChannel; pc++) {
-                    if (placed >= 3) break;
-                    ppath = folder + base + "__DAPI_plus_C" + pc + ".jpg";
-                    if (!File.exists(ppath)) continue;
-                    open(ppath);
-                    smallTitle = getTitle();
-                    // Ensure exact size match
-                    if (getWidth()!=sW || getHeight()!=sH) {
-                        run("Size...", "width=" + sW + " height=" + sH + " average interpolation=Bilinear");
-                    }
-                    run("Copy");
-                    selectWindow(panelTitle);
-                    makeRectangle(0, yoff, sW, sH);
-                    run("Paste");
-                    // Draw tile border
-                    drawThickBorder(0, yoff, sW, sH, borderWidth);
-                    yoff = yoff + sH;
-                    selectWindow(smallTitle);
-                    close();
-                    placed = placed + 1;
+        }
+        if (mergeSavePath != "" && mergeSavePath != largerImagePath) {
+            if (smallerCount < 3) {
+                smallerImagePaths[smallerCount] = mergeSavePath;
+                smallerCount++;
+            }
+        }
+        
+        // Create panel if we have at least one smaller image and the larger image exists
+        if (smallerCount > 0 && largerImagePath != "" && File.exists(largerImagePath)) {
+            // Get dimensions of first smaller image
+            open(smallerImagePaths[0]);
+            sW = getWidth(); sH = getHeight();
+            close();
+            
+            // Calculate panel height based on number of smaller images
+            panelH = smallerCount * sH;
+            
+            // Prepare larger image resized to panel height
+            open(largerImagePath);
+            run("Size...", "height=" + panelH + " constrain average interpolation=Bilinear");
+            lW = getWidth();
+            largerTitle = getTitle();
+            
+            // Create panel canvas
+            newImage("PANEL_"+base, "RGB black", sW + lW, panelH, 1);
+            panelTitle = getTitle();
+            
+            // Prepare border style (thick white lines)
+            setForegroundColor(255,255,255);
+            borderWidth = 20;
+            
+            // Paste smaller images stacked on left
+            yoff = 0;
+            for (si=0; si<smallerCount; si++) {
+                if (!File.exists(smallerImagePaths[si])) continue;
+                open(smallerImagePaths[si]);
+                smallTitle = getTitle();
+                // Ensure exact size match
+                if (getWidth()!=sW || getHeight()!=sH) {
+                    run("Size...", "width=" + sW + " height=" + sH + " average interpolation=Bilinear");
                 }
-                // Paste merged on right
-                selectWindow(mergedTitle);
                 run("Copy");
                 selectWindow(panelTitle);
-                makeRectangle(sW, 0, mW, panelH);
+                makeRectangle(0, yoff, sW, sH);
                 run("Paste");
-                // Draw merged image border
-                drawThickBorder(sW, 0, mW, panelH, borderWidth);
-                // Draw outer border
-                drawThickBorder(0, 0, sW + mW, panelH, borderWidth);
-                // Save panel
-                saveAs("Jpeg", folder + base + "__PANEL_LEFT3_PLUS_MERGE.jpg");
-                logText = logText + "    Saved panel: " + folder + base + "__PANEL_LEFT3_PLUS_MERGE.jpg\n";
-                // Close temp panel and merged
-                selectWindow(panelTitle); close();
-                selectWindow(mergedTitle); close();
+                // Draw tile border
+                drawThickBorder(0, yoff, sW, sH, borderWidth);
+                yoff = yoff + sH;
+                selectWindow(smallTitle);
+                close();
             }
+            
+            // Paste larger image on right
+            selectWindow(largerTitle);
+            run("Copy");
+            selectWindow(panelTitle);
+            makeRectangle(sW, 0, lW, panelH);
+            run("Paste");
+            // Draw larger image border
+            drawThickBorder(sW, 0, lW, panelH, borderWidth);
+            // Draw outer border
+            drawThickBorder(0, 0, sW + lW, panelH, borderWidth);
+            
+            // Save panel
+            saveAs("Jpeg", folder + base + "__PANEL.jpg");
+            logText = logText + "    Saved panel: " + folder + base + "__PANEL.jpg (larger: " + panelLargerImage + ")\n";
+            
+            // Close temp panel and larger image
+            selectWindow(panelTitle); close();
+            selectWindow(largerTitle); close();
         }
 
         // Close everything from this file before next
         run("Close All");
-        if (isOpen(orig)) { selectWindow(orig); close(); }
+        safeClose(orig);
 
         print("Saved: " + base + " (DAPI, DAPI+channels, final merge)");
         logText = logText + "    Status: completed\n";
@@ -636,6 +652,38 @@ function getColorChannelMapping(colorName) {
     if (colorName == "Yellow") return "c1= c2=";  // Red + Green
     if (colorName == "None") return "";
     return "";  // Default: no mapping
+}
+
+// --- helper: safely close a window if it exists ---
+function safeClose(windowName) {
+    if (isOpen(windowName)) {
+        selectWindow(windowName);
+        close();
+    }
+}
+
+// --- helper: cleanup multiple temporary windows from comma-separated list ---
+function cleanupTempWindows(windowNames) {
+    if (windowNames == "") return;
+    names = split(windowNames, ",");
+    for (i = 0; i < names.length; i++) {
+        safeClose(trim(names[i]));
+    }
+}
+
+// --- helper: trim whitespace from string (simple implementation) ---
+function trim(str) {
+    // Remove leading spaces
+    while (lengthOf(str) > 0 && substring(str, 0, 1) == " ") {
+        str = substring(str, 1);
+    }
+    // Remove trailing spaces
+    len = lengthOf(str);
+    while (len > 0 && substring(str, len - 1, len) == " ") {
+        str = substring(str, 0, len - 1);
+        len = lengthOf(str);
+    }
+    return str;
 }
 
 // --- helper: merge spec for DAPI + single channel using user-defined colors ---

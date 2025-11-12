@@ -10,12 +10,6 @@
 //  - A final merged image (DAPI plus up to C2–C4), saved.
 //  - A panel combining up to three DAPI+channel composites stacked on the left
 //    and the large merged image on the right, with thin white borders.
-// Update (v4):
-//  - Automatically adapts to three-channel acquisitions (C1/DAPI blue,
-//    C2 green, C3 red) without requiring a dummy fourth channel.
-//  - Ensures consistent colour mapping across DAPI+channel composites
-//    and the final merge (blue nuclei, green C2, red C3, optional fourth
-//    channel reserved for far-red/gray).
 // Options:
 //  - Optional Enhance Contrast (saturation percent) for autoscaling.
 //  - Optional fixed display range via setMinAndMax (with optional Apply LUT
