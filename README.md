@@ -1,56 +1,41 @@
 ## ImageJ-macro-workbench
 
-ND2/CZI/TIFF Image Analyzer (Fiji Macros): I maintain a set of ImageJ/Fiji macros that automate DAPI and multichannel exports from ND2, CZI, and TIFF acquisitions for reproducibility. Each script supports one to four fluorescence channels and produces publication-ready JPEG outputs and figure panels.
+This repository hosts the `Image Analyzer` Fiji macro for batch-processing ND2, CZI, and TIFF microscopy datasets. The script automates DAPI and multi-channel exports, applies reproducible display settings, and produces figure-ready JPEG panels.
 
 ### Repository Contents
-- `0_ImageAnalyzer_v1.ijm` → My foundational pipeline that generates DAPI-only, DAPI+channel, full-merge, and composite panel outputs.
-- `0_ImageAnalyzer_v2.ijm` → Adds optional per-channel intensity ranges and thicker panel borders.
-- `0_ImageAnalyzer_v3.ijm` → Replaces border drawing with a deterministic fill-based helper.
-- `0_ImageAnalyzer_v4.ijm` → Locks in colour mapping, handles three-channel datasets seamlessly, and writes a processing log.
-- `0_ImageAnalyzer_v5.ijm` → Adds user-defined color assignment, CZI support, C1 intensity control, customizable panel layouts, and centralized cleanup routines.
-- `macros/README.md` → My detailed comparison of all releases.
+- `macros/0_ImageAnalyzer_v1.ijm` — the macro for DAPI + multi-channel batch processing.
+- `macros/README.md` — feature overview and usage notes.
 
 ### Requirements
 - Fiji (ImageJ) distribution with the **Bio-Formats** plugin.
-- ND2, CZI, or TIFF files from compatible microscopy systems (Nikon, Zeiss, or other formats supported by Bio-Formats).
+- ND2, CZI, or TIFF files from compatible microscopy systems.
 
 ### Installation
 1. Download or clone this repository.
-2. Copy the `.ijm` macro you want into your Fiji macros folder (`Fiji.app/macros/` or another scripts location).
+2. Copy `macros/0_ImageAnalyzer_v1.ijm` into your Fiji macros folder (`Fiji.app/macros/` or another scripts location).
 3. Launch Fiji, go to `Plugins → Macros → Run...`, and select the macro.
 
 ### Usage Overview
-1. Run the macro and choose the folder containing ND2, CZI, or TIFF files.
-2. Configure the dialog options I expose:
+1. Run the macro and choose a folder containing ND2, CZI, or TIFF files.
+2. Configure the dialog options:
    - Enhance contrast (global or per-channel saturation).
-   - Global or per-channel fixed intensity ranges (C1-C4); optional LUT baking.
+   - Fixed intensity ranges per channel (C1–C4) with optional LUT baking.
+   - Channel colors, including composite colors (Cyan, Magenta, Yellow).
+   - Panel layout (choose which image appears larger).
    - Scale-bar length, font size, and thickness.
-   - User-defined color assignment for each channel (v5+).
-   - Panel layout selection to choose which image appears larger (v5+).
-3. The macro processes each file and writes JPEG outputs beside the source data:
+3. Review the generated outputs saved next to the source data:
    - `__DAPI.jpg`
-   - `__DAPI_plus_Cn.jpg` for each detected channel (up to C4)
+   - `__DAPI_plus_Cn.jpg` (per detected channel up to C4)
    - `__MERGE_DAPI_C2_C3_...jpg`
-   - `__PANEL.jpg` (v5+) or `__PANEL_LEFT3_PLUS_MERGE.jpg` (v1-v4)
-4. A log file (`ImageAnalyzer_Log.txt` in v5+, `ND2_ImageAnalyzer_Log.txt` in v4) summarises the settings and results.
-
-### Choosing a Version
-- **v1**: My quickstart option with global contrast control only.
-- **v2**: Ideal when individual fluorophores need custom display ranges.
-- **v3**: Best when I need perfectly consistent panel borders for figures.
-- **v4**: My default choice for colour fidelity, three-channel robustness, and audit logging.
-- **v5** *(latest)*: Recommended for flexible color assignment, CZI support, C1 intensity control, customizable panel layouts, and improved code maintainability.
-
-See `macros/README.md` for the full changelog and technical notes.
+   - `__PANEL.jpg`
+4. Consult `ImageAnalyzer_Log.txt` for a record of settings and processed files.
 
 ### Contributing
 I welcome pull requests and issue reports. Please include:
 - Fiji/ImageJ version and operating system.
 - Dataset characteristics (channel count, acquisition settings).
-- Steps that reproduce bugs or justify enhancement ideas.
+- Steps to reproduce bugs or justify enhancement ideas.
 
 ### License
-I release this project under the MIT License. See `LICENSE` for details.  
-Thank you to the Image Analysis community for building and maintaining Fiji, the platform that makes these macros possible.
-
-
+This project is released under the MIT License. See `LICENSE` for details.  
+Thank you to the Image Analysis community for maintaining Fiji and Bio-Formats.

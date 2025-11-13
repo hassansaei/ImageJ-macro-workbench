@@ -1,6 +1,3 @@
-# Test folder
-test/
-
 # macOS
 .DS_Store
 .DS_Store?
@@ -20,3 +17,5 @@ Thumbs.db
 *.tmp
 *~
 
+# Test folder
+test/
