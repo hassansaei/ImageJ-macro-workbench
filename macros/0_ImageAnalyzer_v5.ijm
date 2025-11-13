@@ -23,7 +23,7 @@
 //  - Automatic logging: processing details saved to ImageAnalyzer_Log.txt
 // ------------------------------------------------------------
 
-macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILES (v5)" {
+macro "Image Analyzer → DAPI and Multi-Channel Processing — ALL FILES (v5)" {
     // 1) Pick folder
     folder = getDirectory("Choose a folder with ND2, CZI, or TIFF files");
 

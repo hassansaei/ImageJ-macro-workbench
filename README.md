@@ -3,11 +3,11 @@
 ND2/CZI/TIFF Image Analyzer (Fiji Macros): I maintain a set of ImageJ/Fiji macros that automate DAPI and multichannel exports from ND2, CZI, and TIFF acquisitions for reproducibility. Each script supports one to four fluorescence channels and produces publication-ready JPEG outputs and figure panels.
 
 ### Repository Contents
-- `0_NikonAx_ImageAnalyzer_4Channels_v1.ijm` → My foundational pipeline that generates DAPI-only, DAPI+channel, full-merge, and composite panel outputs.
-- `0_NikonAx_ImageAnalyzer_4Channels_v2.ijm` → Adds optional per-channel intensity ranges and thicker panel borders.
-- `0_NikonAx_ImageAnalyzer_4Channels_v3.ijm` → Replaces border drawing with a deterministic fill-based helper.
-- `0_NikonAx_ImageAnalyzer_4Channels_v4.ijm` → Locks in colour mapping, handles three-channel datasets seamlessly, and writes a processing log.
-- `0_NikonAx_ImageAnalyzer_4Channels_v5.ijm` → Adds user-defined color assignment, CZI support, C1 intensity control, customizable panel layouts, and centralized cleanup routines.
+- `0_ImageAnalyzer_v1.ijm` → My foundational pipeline that generates DAPI-only, DAPI+channel, full-merge, and composite panel outputs.
+- `0_ImageAnalyzer_v2.ijm` → Adds optional per-channel intensity ranges and thicker panel borders.
+- `0_ImageAnalyzer_v3.ijm` → Replaces border drawing with a deterministic fill-based helper.
+- `0_ImageAnalyzer_v4.ijm` → Locks in colour mapping, handles three-channel datasets seamlessly, and writes a processing log.
+- `0_ImageAnalyzer_v5.ijm` → Adds user-defined color assignment, CZI support, C1 intensity control, customizable panel layouts, and centralized cleanup routines.
 - `macros/README.md` → My detailed comparison of all releases.
 
 ### Requirements

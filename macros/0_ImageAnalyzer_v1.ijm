@@ -17,7 +17,7 @@
 //  - Scale bar length, font size, and thickness are configurable.
 // ------------------------------------------------------------
 
-macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILES" {
+macro "Image Analyzer → DAPI and Multi-Channel Processing — ALL FILES (v1)" {
     // 1) Pick folder
     folder = getDirectory("Choose a folder with ND2 or TIFF files");
 
@@ -32,14 +32,6 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
     Dialog.addNumber("Fixed min intensity", 50);
     Dialog.addNumber("Fixed max intensity", 3000);
     Dialog.addCheckbox("Apply LUT (bake scaling into pixels)", false);
-    // Optional per-channel fixed ranges for C2–C4
-    Dialog.addCheckbox("Use per-channel fixed ranges for C2–C4", false);
-    Dialog.addNumber("C2 min intensity", 50);
-    Dialog.addNumber("C2 max intensity", 3000);
-    Dialog.addNumber("C3 min intensity", 50);
-    Dialog.addNumber("C3 max intensity", 3000);
-    Dialog.addNumber("C4 min intensity", 50);
-    Dialog.addNumber("C4 max intensity", 3000);
     Dialog.show();
 	satPct  = Dialog.getNumber();
 	doEnhance = Dialog.getCheckbox();
@@ -50,13 +42,6 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
     fixedMin = Dialog.getNumber();
     fixedMax = Dialog.getNumber();
     applyLUT = Dialog.getCheckbox();
-    useFixedPer = Dialog.getCheckbox();
-    c2Min = Dialog.getNumber();
-    c2Max = Dialog.getNumber();
-    c3Min = Dialog.getNumber();
-    c3Max = Dialog.getNumber();
-    c4Min = Dialog.getNumber();
-    c4Max = Dialog.getNumber();
 
     // 3) Process all ND2 files
     files = getFileList(folder);
@@ -88,23 +73,11 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
         run("Duplicate...", "title=Work_Stack duplicate");
         selectWindow("Work_Stack");
         if (useFixed) {
-            // Apply one fixed display range to all channels before splitting
+            // Apply fixed display range to each slice/channel before splitting
             Stack.setDisplayMode("composite");
             for (cc=1; cc<=C; cc++) {
                 Stack.setChannel(cc);
                 setMinAndMax(fixedMin, fixedMax);
-            }
-            if (applyLUT) {
-                run("Apply LUT");
-            }
-        } else if (useFixedPer) {
-            // Apply per-channel fixed ranges for C2–C4 before splitting
-            Stack.setDisplayMode("composite");
-            for (cc=1; cc<=C; cc++) {
-                Stack.setChannel(cc);
-                if (cc==2) setMinAndMax(c2Min, c2Max);
-                else if (cc==3) setMinAndMax(c3Min, c3Max);
-                else if (cc==4) setMinAndMax(c4Min, c4Max);
             }
             if (applyLUT) {
                 run("Apply LUT");
@@ -122,7 +95,7 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
         }
         // clean 8-bit DAPI temp for merging
         selectWindow(dapiSrc);
-		if (!useFixed && !useFixedPer && doEnhance) {
+		if (!useFixed && doEnhance) {
             run("Enhance Contrast", "saturated=" + satPct);
         }
         run("Duplicate...", "title=__TMP_DAPI");
@@ -143,7 +116,7 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
 
             // 8-bit copy of channel c
             selectWindow(cname);
-			if (!useFixed && !useFixedPer && doEnhance) {
+			if (!useFixed && doEnhance) {
                 run("Enhance Contrast", "saturated=" + satPct);
             }
             run("Duplicate...", "title=__TMP_CH");
@@ -169,7 +142,7 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
                 kname = "C" + k + "-Work_Stack";
                 if (!isOpen(kname)) continue;
                 selectWindow(kname);
-				if (!useFixed && !useFixedPer && doEnhance) {
+				if (!useFixed && doEnhance) {
                     run("Enhance Contrast", "saturated=" + satPct);
                 }
                 run("Duplicate...", "title=__TMP_C" + k);
@@ -226,8 +199,7 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
 				panelTitle = getTitle();
 				// Prepare border style (thin white lines)
 				setForegroundColor(255,255,255);
-				borderWidth = 200;
-				setLineWidth(borderWidth);
+				setLineWidth(4);
 			// Paste small panels stacked on left
 				yoff = 0;
 				placed = 0;
@@ -247,7 +219,6 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
 					run("Paste");
 					// Draw tile border
 					makeRectangle(0, yoff, sW, sH);
-					setLineWidth(borderWidth);
 					run("Draw");
 					run("Select None");
 					yoff = yoff + sH;
@@ -263,16 +234,14 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
 				run("Paste");
 				// Draw merged image border
 				makeRectangle(sW, 0, mW, panelH);
-				setLineWidth(borderWidth);
 				run("Draw");
 				run("Select None");
 				// Draw outer border
 				makeRectangle(0, 0, sW + mW, panelH);
-				setLineWidth(borderWidth);
 				run("Draw");
 				run("Select None");
-				// Save panel
-				saveAs("Jpeg", folder + base + "__PANEL_LEFT3_PLUS_MERGE.jpg");
+                // Save panel
+                saveAs("Jpeg", folder + base + "__PANEL_LEFT3_PLUS_MERGE.jpg");
 				// Close temp panel and merged
 				selectWindow(panelTitle); close();
 				selectWindow(mergedTitle); close();
@@ -296,5 +265,3 @@ function getBaseName(filename){
     if (dot > 0) return substring(filename, 0, dot);
     return filename;
 }
-
-

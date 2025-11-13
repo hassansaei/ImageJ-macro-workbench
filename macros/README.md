@@ -1,6 +1,6 @@
-## ND2/CZI/TIFF Image Analyzer (4-Channel) — Version Comparison Report
+## Image Analyzer — Version Comparison Report
 
-I developed the `0_NikonAx_ImageAnalyzer_4Channels` macro series to streamline fluorescent image exports from ND2, CZI, and TIFF datasets with speciall focus on reproducibility of the exported results. Below, I describe each release and how the toolset evolved between v1 and v5.
+I developed the `ImageAnalyzer` macro series to streamline fluorescent image exports from ND2, CZI, and TIFF datasets with speciall focus on reproducibility of the exported results. Below, I describe each release and how the toolset evolved between v1 and v5.
 
 
 ### v1 — Initial Batch Pipeline

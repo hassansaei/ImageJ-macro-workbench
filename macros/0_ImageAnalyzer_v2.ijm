@@ -17,7 +17,7 @@
 //  - Scale bar length, font size, and thickness are configurable.
 // ------------------------------------------------------------
 
-macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILES" {
+macro "Image Analyzer → DAPI and Multi-Channel Processing — ALL FILES (v2)" {
     // 1) Pick folder
     folder = getDirectory("Choose a folder with ND2 or TIFF files");
 
@@ -224,9 +224,10 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
 				// Create panel canvas
 				newImage("PANEL_"+base, "RGB black", sW + mW, panelH, 1);
 				panelTitle = getTitle();
-				// Prepare border style (thick white lines)
+				// Prepare border style (thin white lines)
 				setForegroundColor(255,255,255);
-				borderWidth = 20;
+				borderWidth = 200;
+				setLineWidth(borderWidth);
 			// Paste small panels stacked on left
 				yoff = 0;
 				placed = 0;
@@ -245,7 +246,10 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
 					makeRectangle(0, yoff, sW, sH);
 					run("Paste");
 					// Draw tile border
-					drawThickBorder(0, yoff, sW, sH, borderWidth);
+					makeRectangle(0, yoff, sW, sH);
+					setLineWidth(borderWidth);
+					run("Draw");
+					run("Select None");
 					yoff = yoff + sH;
 					selectWindow(smallTitle);
 					close();
@@ -258,9 +262,15 @@ macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILE
 				makeRectangle(sW, 0, mW, panelH);
 				run("Paste");
 				// Draw merged image border
-				drawThickBorder(sW, 0, mW, panelH, borderWidth);
+				makeRectangle(sW, 0, mW, panelH);
+				setLineWidth(borderWidth);
+				run("Draw");
+				run("Select None");
 				// Draw outer border
-				drawThickBorder(0, 0, sW + mW, panelH, borderWidth);
+				makeRectangle(0, 0, sW + mW, panelH);
+				setLineWidth(borderWidth);
+				run("Draw");
+				run("Select None");
 				// Save panel
 				saveAs("Jpeg", folder + base + "__PANEL_LEFT3_PLUS_MERGE.jpg");
 				// Close temp panel and merged
@@ -285,23 +295,6 @@ function getBaseName(filename){
     dot = lastIndexOf(filename, ".");
     if (dot > 0) return substring(filename, 0, dot);
     return filename;
-}
-
-// --- helper: draw thick border rectangle ---
-function drawThickBorder(x, y, w, h, thickness) {
-    // Draw top edge
-    makeRectangle(x, y, w, thickness);
-    run("Fill");
-    // Draw bottom edge
-    makeRectangle(x, y + h - thickness, w, thickness);
-    run("Fill");
-    // Draw left edge
-    makeRectangle(x, y, thickness, h);
-    run("Fill");
-    // Draw right edge
-    makeRectangle(x + w - thickness, y, thickness, h);
-    run("Fill");
-    run("Select None");
 }
 
 

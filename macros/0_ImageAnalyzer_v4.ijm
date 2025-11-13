@@ -17,7 +17,7 @@
 //  - Scale bar length, font size, and thickness are configurable.
 // ------------------------------------------------------------
 
-macro "ND2 Image Analyzer→ DAPI-alone, DAPI+Channels, Final Merge — ALL FILES (v4)" {
+macro "Image Analyzer → DAPI and Multi-Channel Processing — ALL FILES (v4)" {
     // 1) Pick folder
     folder = getDirectory("Choose a folder with ND2 or TIFF files");
 
