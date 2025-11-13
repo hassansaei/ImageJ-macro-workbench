@@ -1,0 +1,910 @@
+// ------------------------------------------------------------
+// Author: Hassan Saei
+// Email: hassan.saeiahan@gmail.com
+// Affiliation: Imagine Institute of Genetic Diseases, U1163 INSERM
+//
+// Description:
+// This ImageJ/Fiji macro batch-processes ND2, CZI, and TIFF microscopy files to produce:
+//  - A DAPI-only image with a scale bar.
+//  - Individual channel renderings (C1–C4) with scale bars.
+//  - DAPI + up to three other channels (C2–C4) composites, each saved.
+//  - All pairwise composites of non-DAPI channels and an optional no-DAPI composite.
+//  - A final merged image (DAPI plus up to C2–C4), saved.
+//  - A panel created after interactive selection of the larger preview image and supporting tiles,
+//    with white borders and automatic resizing.
+// Options:
+//  - File format support: ND2 (Nikon), CZI (Zeiss), and TIFF files
+//  - Optional Enhance Contrast (saturation percent) for autoscaling
+//  - Optional fixed display range via setMinAndMax (global or per-channel for C1-C4)
+//    with optional Apply LUT to bake scaling into pixels
+//  - Per-channel intensity control: independent min/max ranges for C1 (DAPI), C2, C3, and C4
+//  - Scale bar: configurable length (µm), font size, and thickness (px)
+//  - User-defined color assignment for each channel (C1/DAPI, C2, C3, C4):
+//    choose from Red, Green, Blue, Gray, Cyan, Magenta, Yellow, or None
+//  - Panel layout: select which image appears larger (Merged, DAPI+C2, DAPI+C3, or DAPI+C4)
+//  - Automatic logging: processing details saved to ImageAnalyzer_Log.txt
+// ------------------------------------------------------------
+
+macro "Image Analyzer → DAPI and Multi-Channel Processing — ALL FILES (v1.1)" {
+    // 1) Pick folder
+    folder = getDirectory("Choose a folder with ND2, CZI, or TIFF files");
+
+    // 2) Settings (once)
+    Dialog.create("Settings");
+    Dialog.addCheckbox("Enable enhance contrast", true);
+    Dialog.addNumber("Enhance contrast (saturated %, e.g. 0.5):", 0.5);
+    Dialog.addNumber("Scale bar length (µm):", 50);
+    Dialog.addNumber("Scale bar font size:", 90);
+    Dialog.addNumber("Scale bar thickness (px):", 100);
+    Dialog.addCheckbox("Use fixed display range (setMinAndMax)", false);
+    Dialog.addNumber("Fixed min intensity", 50);
+    Dialog.addNumber("Fixed max intensity", 3000);
+    Dialog.addCheckbox("Apply LUT (bake scaling into pixels)", false);
+    // Optional per-channel fixed ranges for C1–C4
+    Dialog.addCheckbox("Use per-channel fixed ranges for C1–C4", false);
+    Dialog.addNumber("C1 (DAPI) min intensity", 50);
+    Dialog.addNumber("C1 (DAPI) max intensity", 3000);
+    Dialog.addNumber("C2 min intensity", 50);
+    Dialog.addNumber("C2 max intensity", 3000);
+    Dialog.addNumber("C3 min intensity", 50);
+    Dialog.addNumber("C3 max intensity", 3000);
+    Dialog.addNumber("C4 min intensity", 50);
+    Dialog.addNumber("C4 max intensity", 3000);
+    // Channel Color Selection
+    Dialog.addMessage("--- Channel Color Assignment ---");
+    Dialog.addChoice("C1 (DAPI) color:", newArray("Blue", "Red", "Green", "Gray", "Cyan", "Magenta", "Yellow", "None"), "Blue");
+    Dialog.addChoice("C2 color:", newArray("Green", "Red", "Blue", "Gray", "Cyan", "Magenta", "Yellow", "None"), "Green");
+    Dialog.addChoice("C3 color:", newArray("Red", "Green", "Blue", "Gray", "Cyan", "Magenta", "Yellow", "None"), "Red");
+    Dialog.addChoice("C4 color:", newArray("Gray", "Red", "Green", "Blue", "Cyan", "Magenta", "Yellow", "None"), "Gray");
+    Dialog.addMessage("--- Panel Layout ---");
+    panelLargeOptions = newArray("Merged (DAPI)", "DAPI", "DAPI+C2", "DAPI+C3", "DAPI+C4", "No DAPI", "C2", "C3", "C4", "C2+C3", "C2+C4", "C3+C4");
+    panelSmallOptions = newArray("None", "DAPI", "DAPI+C2", "DAPI+C3", "DAPI+C4", "No DAPI", "C2", "C3", "C4", "C2+C3", "C2+C4", "C3+C4");
+    Dialog.addChoice("Large panel image:", panelLargeOptions, panelLargeOptions[0]);
+    Dialog.addChoice("Smaller image slot 1:", panelSmallOptions, "DAPI");
+    Dialog.addChoice("Smaller image slot 2:", panelSmallOptions, "DAPI+C2");
+    Dialog.addChoice("Smaller image slot 3:", panelSmallOptions, "DAPI+C3");
+    Dialog.show();
+    satPct  = Dialog.getNumber();
+    doEnhance = Dialog.getCheckbox();
+    sbLen   = Dialog.getNumber();
+    sbFont  = Dialog.getNumber();
+    sbThick = Dialog.getNumber();
+    useFixed = Dialog.getCheckbox();
+    fixedMin = Dialog.getNumber();
+    fixedMax = Dialog.getNumber();
+    applyLUT = Dialog.getCheckbox();
+    useFixedPer = Dialog.getCheckbox();
+    c1Min = Dialog.getNumber();
+    c1Max = Dialog.getNumber();
+    c2Min = Dialog.getNumber();
+    c2Max = Dialog.getNumber();
+    c3Min = Dialog.getNumber();
+    c3Max = Dialog.getNumber();
+    c4Min = Dialog.getNumber();
+    c4Max = Dialog.getNumber();
+    // Get color choices (must be retrieved in order after all other fields)
+    c1Color = Dialog.getChoice();
+    c2Color = Dialog.getChoice();
+    c3Color = Dialog.getChoice();
+    c4Color = Dialog.getChoice();
+    panelLargerImage = Dialog.getChoice();
+    panelSmallChoice1 = Dialog.getChoice();
+    panelSmallChoice2 = Dialog.getChoice();
+    panelSmallChoice3 = Dialog.getChoice();
+    
+    // Debug: Print selected colors
+    panelSmallerSelections = newArray(panelSmallChoice1, panelSmallChoice2, panelSmallChoice3);
+    panelSmallerChoicesLog = panelSmallChoice1 + ", " + panelSmallChoice2 + ", " + panelSmallChoice3;
+
+    print("Selected colors - C1: " + c1Color + ", C2: " + c2Color + ", C3: " + c3Color + ", C4: " + c4Color);
+    print("Panel - Large: " + panelLargerImage + ", Smaller slots: [" + panelSmallChoice1 + ", " + panelSmallChoice2 + ", " + panelSmallChoice3 + "]");
+
+    timestamp = getTimestamp();
+    analysisSuffix = getDateFolderSuffix();
+    outputDir = folder + "analysis_" + analysisSuffix + "/";
+    File.makeDirectory(outputDir);
+    logFile = outputDir + "ImageAnalyzer_Log_" + analysisSuffix + ".txt";
+    logText = "Image Analyzer Log\n";
+    logText = logText + "Run timestamp: " + timestamp + "\n";
+    logText = logText + "Input folder: " + folder + "\n";
+    logText = logText + "Output folder: " + outputDir + "\n";
+    logText = logText + "Enhance contrast enabled: " + boolToString(doEnhance) + "\n";
+    logText = logText + "Enhance contrast saturation (%): " + satPct + "\n";
+    logText = logText + "Scale bar length (µm): " + sbLen + "\n";
+    logText = logText + "Scale bar font size: " + sbFont + "\n";
+    logText = logText + "Scale bar thickness (px): " + sbThick + "\n";
+    logText = logText + "Use fixed range for all channels: " + boolToString(useFixed) + "\n";
+    logText = logText + "Fixed min intensity: " + fixedMin + "\n";
+    logText = logText + "Fixed max intensity: " + fixedMax + "\n";
+    logText = logText + "Apply LUT: " + boolToString(applyLUT) + "\n";
+    logText = logText + "Use per-channel fixed ranges: " + boolToString(useFixedPer) + "\n";
+    logText = logText + "C1 (DAPI) min/max: " + c1Min + " / " + c1Max + "\n";
+    logText = logText + "C2 min/max: " + c2Min + " / " + c2Max + "\n";
+    logText = logText + "C3 min/max: " + c3Min + " / " + c3Max + "\n";
+    logText = logText + "C4 min/max: " + c4Min + " / " + c4Max + "\n";
+    logText = logText + "Channel colors - C1: " + c1Color + ", C2: " + c2Color + ", C3: " + c3Color + ", C4: " + c4Color + "\n";
+    logText = logText + "Panel larger image: " + panelLargerImage + "\n";
+    logText = logText + "Panel smaller images: " + panelSmallerChoicesLog + "\n";
+    logText = logText + "\nProcessed files:\n";
+    processedCount = 0;
+
+    // 4) Process all files
+    files = getFileList(folder);
+    setBatchMode(true);
+
+    for (i=0; i<files.length; i++) {
+        mergeSavePath = "";
+        dapiAlonePath = "";
+        noDapiPath = "";
+        file = files[i];
+        fLower = toLowerCase(file);
+        isND2 = endsWith(fLower, ".nd2");
+        isTIF = endsWith(fLower, ".tif") || endsWith(fLower, ".tiff");
+        isCZI = endsWith(fLower, ".czi");
+        if (!(isND2 || isTIF || isCZI)) continue;
+
+        fullPath = folder + file;
+        base = getBaseName(file);
+        logText = logText + "- " + file + "\n";
+        print("\\ Processing: " + fullPath);
+
+        // Open via Bio-Formats as composite hyperstack (supports ND2, CZI, and TIFF)
+        // Using color_mode=Colorized to preserve original LUT colors from file metadata
+        run("Bio-Formats Importer", "open=[" + fullPath + "] color_mode=Colorized view=Hyperstack stack_order=XYCZT autoscale");
+        orig = getTitle();
+        Stack.setDisplayMode("composite");
+        Stack.getDimensions(w,h,C,Z,T);
+        if (C < 1) { safeClose(orig); continue; }
+        // Limit to DAPI + 3 channels (C2..C4)
+        maxChannel = C;
+        if (maxChannel > 4) maxChannel = 4;
+
+        // Duplicate & split channels
+        run("Duplicate...", "title=Work_Stack duplicate");
+        selectWindow("Work_Stack");
+        if (useFixed) {
+            // Apply one fixed display range to all channels before splitting
+            Stack.setDisplayMode("composite");
+            for (cc=1; cc<=C; cc++) {
+                Stack.setChannel(cc);
+                setMinAndMax(fixedMin, fixedMax);
+            }
+            if (applyLUT) {
+                run("Apply LUT");
+            }
+        } else if (useFixedPer) {
+            // Apply per-channel fixed ranges for C1–C4 before splitting
+            Stack.setDisplayMode("composite");
+            for (cc=1; cc<=C; cc++) {
+                Stack.setChannel(cc);
+                if (cc==1) setMinAndMax(c1Min, c1Max);
+                else if (cc==2) setMinAndMax(c2Min, c2Max);
+                else if (cc==3) setMinAndMax(c3Min, c3Max);
+                else if (cc==4) setMinAndMax(c4Min, c4Max);
+            }
+            if (applyLUT) {
+                run("Apply LUT");
+            }
+        }
+        run("Split Channels");
+
+        // Remove LUT colors from all split channels to allow custom color assignment
+        // Convert all channels to grayscale (removes LUT colors)
+        for (cc=1; cc<=C; cc++) {
+            cname = "C" + cc + "-Work_Stack";
+            if (isOpen(cname)) {
+                selectWindow(cname);
+                // Set LUT to grayscale to remove original colors
+                run("Grays");
+            }
+        }
+
+        // Make clean 8-bit DAPI temp and save DAPI-alone ----------
+        dapiSrc = "C1-Work_Stack";
+        if (!isOpen(dapiSrc)) {
+            print("No C1 (DAPI) found; skipping file.");
+            logText = logText + "    Skipped: no C1 (DAPI) channel detected.\n";
+            run("Close All");
+            safeClose(orig);
+            continue;
+        }
+        // clean 8-bit DAPI temp for merging
+        selectWindow(dapiSrc);
+        if (!useFixed && !useFixedPer && doEnhance) {
+            run("Enhance Contrast", "saturated=" + satPct);
+        }
+        run("Duplicate...", "title=__TMP_DAPI");
+        selectWindow("__TMP_DAPI"); 
+        run("8-bit");
+        run("Grays");  // Ensure grayscale LUT
+
+        // DAPI alone (with scalebar and user-selected color)
+        run("Duplicate...", "title=__TMP_DAPI_SAVE");
+        selectWindow("__TMP_DAPI_SAVE");
+        applyColorLUT(c1Color);
+        run("Scale Bar...", "width=" + sbLen + " height=" + sbThick + " font=" + sbFont + " color=White background=None location=[Lower Right] bold overlay");
+        dapiAlonePath = outputDir + base + "__DAPI.jpg";
+        saveAs("Jpeg", dapiAlonePath);
+        logText = logText + "    Saved DAPI image: " + dapiAlonePath + "\n";
+        registerPanelOption("DAPI", dapiAlonePath);
+        close(); // __TMP_DAPI_SAVE
+
+        // DAPI + each other channel (C2..C4)
+        for (c=2; c<=maxChannel; c++) {
+            cname = "C" + c + "-Work_Stack";
+            if (!isOpen(cname)) continue;
+
+            // 8-bit copy of channel c
+            selectWindow(cname);
+            if (!useFixed && !useFixedPer && doEnhance) {
+                run("Enhance Contrast", "saturated=" + satPct);
+            }
+            run("Duplicate...", "title=__TMP_CH");
+            selectWindow("__TMP_CH"); 
+            run("8-bit");
+            run("Grays");  // Ensure grayscale LUT
+
+            chColor = getChannelColor(c, c2Color, c3Color, c4Color);
+
+            // Save channel alone with scale bar and user-selected color
+            run("Duplicate...", "title=__TMP_CH_SAVE");
+            selectWindow("__TMP_CH_SAVE");
+            applyColorLUT(chColor);
+            run("Scale Bar...", "width=" + sbLen + " height=" + sbThick + " font=" + sbFont + " color=White background=None location=[Lower Right] bold overlay");
+            channelSavePath = outputDir + base + "__C" + c + ".jpg";
+            saveAs("Jpeg", channelSavePath);
+            logText = logText + "    Saved C" + c + " channel: " + channelSavePath + "\n";
+            registerPanelOption("C" + c, channelSavePath);
+            close();
+            selectWindow("__TMP_CH");
+            mergeSpec = getTwoChannelMergeSpecSimple(c, "__TMP_DAPI", "__TMP_CH", c1Color, chColor);
+            print("Merge spec for DAPI+C" + c + ": " + mergeSpec);
+            print("DAPI color: " + c1Color + ", Channel " + c + " color: " + chColor);
+            run("Merge Channels...", mergeSpec + " create keep");
+            run("RGB Color");
+            run("Scale Bar...", "width=" + sbLen + " height=" + sbThick + " font=" + sbFont + " color=White background=None location=[Lower Right] bold overlay");
+            dapiComboPath = outputDir + base + "__DAPI_plus_C" + c + ".jpg";
+            saveAs("Jpeg", dapiComboPath);
+            logText = logText + "    Saved DAPI + C" + c + ": " + dapiComboPath + "\n";
+            registerPanelOption("DAPI+C" + c, dapiComboPath);
+            close(); // merged RGB
+            // Cleanup temp channels
+            cleanupTempWindows("__TMP_CH,__TMP_CH_R,__TMP_CH_G,__TMP_CH_B,__TMP_DAPI_R,__TMP_DAPI_G,__TMP_DAPI_B");
+        }
+
+        // Build merged composites using shared helper
+        mergeChannelList = "";
+        if (isOpen("__TMP_DAPI")) mergeChannelList = "1";
+        for (k = 2; k <= maxChannel; k++) {
+            kname = "C" + k + "-Work_Stack";
+            if (isOpen(kname)) {
+                if (mergeChannelList == "") mergeChannelList = "" + k;
+                else mergeChannelList = mergeChannelList + "," + k;
+            }
+        }
+
+        // Final merged image including DAPI
+        if (mergeChannelList != "" && indexOf(mergeChannelList, "1") == 0) {
+            mergeLabel = "__MERGE_DAPI";
+            for (k = 2; k <= maxChannel; k++) {
+                if (isOpen("C" + k + "-Work_Stack")) mergeLabel = mergeLabel + "_C" + k;
+            }
+            mergeSavePath = createComposite(mergeChannelList, mergeLabel, true, "final merge");
+            if (mergeSavePath != "") {
+                registerPanelOption("Merged (DAPI)", mergeSavePath);
+            }
+        }
+
+        // Composite without DAPI (if any other channels exist)
+        nonDapiList = "";
+        for (k = 2; k <= maxChannel; k++) {
+            if (isOpen("C" + k + "-Work_Stack")) {
+                if (nonDapiList == "") nonDapiList = "" + k;
+                else nonDapiList = nonDapiList + "," + k;
+            }
+        }
+        noDapiPath = "";
+        if (nonDapiList != "") {
+            noDapiPath = createComposite(nonDapiList, "__MERGE_NO_DAPI", true, "composite without DAPI");
+            if (noDapiPath != "") {
+                registerPanelOption("No DAPI", noDapiPath);
+            }
+        }
+
+        // Pairwise composites among non-DAPI channels
+        for (cA = 2; cA <= maxChannel; cA++) {
+            nameA = "C" + cA + "-Work_Stack";
+            if (!isOpen(nameA)) continue;
+            for (cB = cA + 1; cB <= maxChannel; cB++) {
+                nameB = "C" + cB + "-Work_Stack";
+                if (!isOpen(nameB)) continue;
+                pairLabel = "__C" + cA + "_C" + cB;
+                pairChannels = "" + cA + "," + cB;
+                pairPath = createComposite(pairChannels, pairLabel, true, "pairwise composite C" + cA + "+C" + cB);
+                if (pairPath != "") {
+                    registerPanelOption("C" + cA + "+C" + cB, pairPath);
+                }
+            }
+        }
+
+        safeClose("__TMP_DAPI");
+
+        // Create panel using pre-selected options from settings dialog
+        // Map user-selected names to actual file paths
+        selectedPath = getImagePathForLabel(panelLargerImage, base, outputDir, mergeSavePath, noDapiPath, maxChannel);
+        
+        // Resolve smaller image selections into actual file paths
+        panelSmallerPaths = newArray(3);
+        smallerCount = 0;
+        for (si = 0; si < panelSmallerSelections.length && smallerCount < 3; si++) {
+            name = trim(panelSmallerSelections[si]);
+            if (name == "" || name == "None") continue;
+            smallPath = getImagePathForLabel(name, base, outputDir, mergeSavePath, noDapiPath, maxChannel);
+            if (smallPath == "" || !File.exists(smallPath) || smallPath == selectedPath) continue;
+            // Avoid duplicates
+            duplicate = false;
+            for (sj = 0; sj < smallerCount; sj++) {
+                if (panelSmallerPaths[sj] == smallPath) {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (!duplicate) {
+                panelSmallerPaths[smallerCount] = smallPath;
+                smallerCount++;
+            }
+        }
+
+        // Create panel if we have valid paths
+        if (smallerCount > 0 && selectedPath != "" && File.exists(selectedPath) && File.exists(panelSmallerPaths[0])) {
+            open(panelSmallerPaths[0]);
+            sW = getWidth(); sH = getHeight();
+            close();
+
+            panelH = smallerCount * sH;
+
+            open(selectedPath);
+            run("Size...", "height=" + panelH + " constrain average interpolation=Bilinear");
+            lW = getWidth();
+            largerTitle = getTitle();
+
+            newImage("PANEL_"+base, "RGB black", sW + lW, panelH, 1);
+            panelTitle = getTitle();
+
+            setForegroundColor(255,255,255);
+            borderWidth = 20;
+
+            yoff = 0;
+            for (si = 0; si < smallerCount; si++) {
+                smallPath = panelSmallerPaths[si];
+                if (!File.exists(smallPath)) continue;
+                open(smallPath);
+                smallTitle = getTitle();
+                if (getWidth()!=sW || getHeight()!=sH) {
+                    run("Size...", "width=" + sW + " height=" + sH + " average interpolation=Bilinear");
+                }
+                run("Copy");
+                selectWindow(panelTitle);
+                makeRectangle(0, yoff, sW, sH);
+                run("Paste");
+                drawThickBorder(0, yoff, sW, sH, borderWidth);
+                yoff = yoff + sH;
+                selectWindow(smallTitle);
+                close();
+            }
+
+            selectWindow(largerTitle);
+            run("Copy");
+            selectWindow(panelTitle);
+            makeRectangle(sW, 0, lW, panelH);
+            run("Paste");
+            drawThickBorder(sW, 0, lW, panelH, borderWidth);
+            drawThickBorder(0, 0, sW + lW, panelH, borderWidth);
+
+            panelSavePath = outputDir + base + "__PANEL.jpg";
+            saveAs("Jpeg", panelSavePath);
+            logText = logText + "    Saved panel: " + panelSavePath + " (larger: " + panelLargerImage + ")\n";
+
+            selectWindow(panelTitle); close();
+            selectWindow(largerTitle); close();
+        } else {
+            reason = "selected resources unavailable";
+            if (smallerCount == 0) {
+                reason = "no smaller images available";
+            } else if (selectedPath == "" || !File.exists(selectedPath)) {
+                reason = "large image \"" + panelLargerImage + "\" not available";
+            }
+            logText = logText + "    Panel skipped: " + reason + ".\n";
+        }
+
+        // Close everything from this file before next
+        run("Close All");
+        safeClose(orig);
+
+        print("Saved: " + base + " (DAPI, DAPI+channels, final merge)");
+        logText = logText + "    Status: completed\n";
+        processedCount++;
+    }
+
+    setBatchMode(false);
+    print("\\ All files processed.");
+    logText = logText + "\nTotal completed files: " + processedCount + "\n";
+    File.saveString(logText, logFile);
+    print("Log saved to: " + logFile);
+}
+
+function boolToString(value) {
+    if (value) return "Yes";
+    return "No";
+}
+
+function getTimestamp() {
+    getDateAndTime(year, month, dayOfWeek, dayOfMonth, hour, minute, second, millisecond);
+    ts = "" + year;
+    ts = ts + "-" + pad2(month);
+    ts = ts + "-" + pad2(dayOfMonth);
+    ts = ts + " " + pad2(hour);
+    ts = ts + ":" + pad2(minute);
+    ts = ts + ":" + pad2(second);
+    return ts;
+}
+
+function getDateFolderSuffix() {
+    getDateAndTime(year, month, dayOfWeek, dayOfMonth, hour, minute, second, millisecond);
+    suffix = "" + year;
+    suffix = suffix + pad2(month);
+    suffix = suffix + pad2(dayOfMonth);
+    return suffix;
+}
+
+function pad2(value) {
+    if (value < 10) return "0" + value;
+    return "" + value;
+}
+
+// --- helper: filename without extension ---
+function getBaseName(filename){
+    dot = lastIndexOf(filename, ".");
+    if (dot > 0) return substring(filename, 0, dot);
+    return filename;
+}
+
+// --- helper: draw thick border rectangle ---
+function drawThickBorder(x, y, w, h, thickness) {
+    // Draw top edge
+    makeRectangle(x, y, w, thickness);
+    run("Fill");
+    // Draw bottom edge
+    makeRectangle(x, y + h - thickness, w, thickness);
+    run("Fill");
+    // Draw left edge
+    makeRectangle(x, y, thickness, h);
+    run("Fill");
+    // Draw right edge
+    makeRectangle(x + w - thickness, y, thickness, h);
+    run("Fill");
+    run("Select None");
+}
+
+// --- helper: get color for a specific channel index ---
+function getChannelColor(channelIndex, c2Color, c3Color, c4Color) {
+    if (channelIndex == 2) return c2Color;
+    if (channelIndex == 3) return c3Color;
+    if (channelIndex == 4) return c4Color;
+    return "None";
+}
+
+// --- helper: map color name to ImageJ merge channel (c1=red, c2=green, c3=blue, c4=gray) ---
+function getColorChannelMapping(colorName) {
+    if (colorName == "Red") return "c1=";
+    if (colorName == "Green") return "c2=";
+    if (colorName == "Blue") return "c3=";
+    if (colorName == "Gray") return "c4=";
+    if (colorName == "Cyan") return "c2= c3=";  // Green + Blue
+    if (colorName == "Magenta") return "c1= c3=";  // Red + Blue
+    if (colorName == "Yellow") return "c1= c2=";  // Red + Green
+    if (colorName == "None") return "";
+    return "";  // Default: no mapping
+}
+
+// --- helper: safely close a window if it exists ---
+function safeClose(windowName) {
+    if (isOpen(windowName)) {
+        selectWindow(windowName);
+        close();
+    }
+}
+
+// --- helper: cleanup multiple temporary windows from comma-separated list ---
+function cleanupTempWindows(windowNames) {
+    if (windowNames == "") return;
+    names = split(windowNames, ",");
+    for (i = 0; i < names.length; i++) {
+        safeClose(trim(names[i]));
+    }
+}
+
+function registerPanelOption(label, path) {
+    // No-op: panel selection now uses pre-selected options from settings dialog
+}
+
+function initCompositeLists() {
+    lists = newArray(5);
+    lists[0] = "";
+    lists[1] = "";
+    lists[2] = "";
+    lists[3] = "";
+    lists[4] = "";
+    return lists;
+}
+
+function appendListItem(existing, item) {
+    if (item == "") return existing;
+    if (existing == "") return item;
+    return existing + "," + item;
+}
+
+function assignToColorLists(baseName, colorName, lists, uniqueTag, addBaseToCleanup) {
+    if (addBaseToCleanup) lists[4] = appendListItem(lists[4], baseName);
+    if (colorName == "" || colorName == "None") return;
+
+    if (colorName == "Red") {
+        lists[0] = appendListItem(lists[0], baseName);
+        return;
+    }
+    if (colorName == "Green") {
+        lists[1] = appendListItem(lists[1], baseName);
+        return;
+    }
+    if (colorName == "Blue") {
+        lists[2] = appendListItem(lists[2], baseName);
+        return;
+    }
+    if (colorName == "Gray") {
+        lists[3] = appendListItem(lists[3], baseName);
+        return;
+    }
+
+    // Composite colors require additional duplicates
+    if (colorName == "Cyan" || colorName == "Magenta" || colorName == "Yellow") {
+        selectWindow(baseName);
+    }
+
+    if (colorName == "Cyan") {
+        dupG = uniqueTag + "_G";
+        run("Duplicate...", "title=" + dupG);
+        selectWindow(dupG);
+        run("Grays");
+        lists[1] = appendListItem(lists[1], dupG);
+        lists[4] = appendListItem(lists[4], dupG);
+
+        selectWindow(baseName);
+        dupB = uniqueTag + "_B";
+        run("Duplicate...", "title=" + dupB);
+        selectWindow(dupB);
+        run("Grays");
+        lists[2] = appendListItem(lists[2], dupB);
+        lists[4] = appendListItem(lists[4], dupB);
+        return;
+    }
+
+    if (colorName == "Magenta") {
+        dupR = uniqueTag + "_R";
+        run("Duplicate...", "title=" + dupR);
+        selectWindow(dupR);
+        run("Grays");
+        lists[0] = appendListItem(lists[0], dupR);
+        lists[4] = appendListItem(lists[4], dupR);
+
+        selectWindow(baseName);
+        dupB = uniqueTag + "_B";
+        run("Duplicate...", "title=" + dupB);
+        selectWindow(dupB);
+        run("Grays");
+        lists[2] = appendListItem(lists[2], dupB);
+        lists[4] = appendListItem(lists[4], dupB);
+        return;
+    }
+
+    if (colorName == "Yellow") {
+        dupR = uniqueTag + "_R";
+        run("Duplicate...", "title=" + dupR);
+        selectWindow(dupR);
+        run("Grays");
+        lists[0] = appendListItem(lists[0], dupR);
+        lists[4] = appendListItem(lists[4], dupR);
+
+        selectWindow(baseName);
+        dupG = uniqueTag + "_G";
+        run("Duplicate...", "title=" + dupG);
+        selectWindow(dupG);
+        run("Grays");
+        lists[1] = appendListItem(lists[1], dupG);
+        lists[4] = appendListItem(lists[4], dupG);
+    }
+}
+
+function buildMergeSegment(listString, channelCode, combinedBase, lists) {
+    if (listString == "") return "";
+    parts = split(listString, ",");
+    if (parts.length == 1) return channelCode + "=[" + parts[0] + "] ";
+
+    combinedName = combinedBase;
+    selectWindow(parts[0]);
+    run("Duplicate...", "title=" + combinedName);
+    lists[4] = appendListItem(lists[4], combinedName);
+    for (j = 1; j < parts.length; j++) {
+        run("Image Calculator...", "image1=[" + combinedName + "] operation=Add image2=[" + parts[j] + "] create 32-bit");
+        safeClose(combinedName);
+        selectWindow("Result of " + combinedName);
+        run("Rename...", "title=" + combinedName);
+    }
+    selectWindow(combinedName);
+    run("8-bit");
+    run("Grays");
+    return channelCode + "=[" + combinedName + "] ";
+}
+
+function getColorForChannelIndex(channelIndex) {
+    if (channelIndex == 1) return "" + c1Color;
+    return "" + getChannelColor(channelIndex, c2Color, c3Color, c4Color);
+}
+
+function createComposite(channelIndexString, labelSuffix, addScaleBar, logDescription) {
+    if (channelIndexString == "") return "";
+    lists = initCompositeLists();
+    indexParts = split(channelIndexString, ",");
+    includedCount = 0;
+
+    for (ci = 0; ci < indexParts.length; ci++) {
+        rawIndex = trim(indexParts[ci]);
+        if (rawIndex == "") continue;
+        chan = strToInt(rawIndex);
+        if (chan < 1) continue;
+
+        if (chan == 1) {
+            if (!isOpen("__TMP_DAPI")) continue;
+            colorName = "" + getColorForChannelIndex(chan);
+            assignToColorLists("__TMP_DAPI", colorName, lists, "__TMP_DAPI_" + labelSuffix + "_" + ci, false);
+            if (colorName != "" && colorName != "None") includedCount++;
+        } else {
+            srcName = "C" + chan + "-Work_Stack";
+            if (!isOpen(srcName)) continue;
+            selectWindow(srcName);
+            if (!useFixed && !useFixedPer && doEnhance) {
+                run("Enhance Contrast", "saturated=" + satPct);
+            }
+            tmpName = "__TMP_C" + chan + "_" + labelSuffix + "_" + ci;
+            run("Duplicate...", "title=" + tmpName);
+            selectWindow(tmpName);
+            run("8-bit");
+            run("Grays");
+            colorName = "" + getColorForChannelIndex(chan);
+            // Track duplicate for cleanup even if color is None
+            assignToColorLists(tmpName, colorName, lists, tmpName, true);
+            if (colorName == "" || colorName == "None") {
+                // Not used; no increment but duplicate recorded for cleanup
+            } else {
+                includedCount++;
+            }
+        }
+    }
+
+    mergeArgs = "";
+    mergeArgs = mergeArgs + buildMergeSegment(lists[0], "c1", "__TMP_RED_COMBINED" + labelSuffix, lists);
+    mergeArgs = mergeArgs + buildMergeSegment(lists[1], "c2", "__TMP_GREEN_COMBINED" + labelSuffix, lists);
+    mergeArgs = mergeArgs + buildMergeSegment(lists[2], "c3", "__TMP_BLUE_COMBINED" + labelSuffix, lists);
+    mergeArgs = mergeArgs + buildMergeSegment(lists[3], "c4", "__TMP_GRAY_COMBINED" + labelSuffix, lists);
+
+    if (mergeArgs == "" || includedCount == 0) {
+        cleanupTempWindows(lists[4]);
+        return "";
+    }
+
+    run("Merge Channels...", mergeArgs + "create");
+    run("RGB Color");
+    if (addScaleBar) {
+        run("Scale Bar...", "width=" + sbLen + " height=" + sbThick + " font=" + sbFont + " color=White background=None location=[Lower Right] bold overlay");
+    }
+
+    savePath = outputDir + base + labelSuffix + ".jpg";
+    saveAs("Jpeg", savePath);
+    logText = logText + "    Saved " + logDescription + ": " + savePath + "\n";
+    close();
+
+    cleanupTempWindows(lists[4]);
+    return savePath;
+}
+
+function strToInt(str) {
+    if (str == "") return 0;
+    v = parseFloat(str);
+    if ("" + v == "NaN") return 0;
+    return floor(v + 0.5);
+}
+
+// --- helper: trim whitespace from string (simple implementation) ---
+function trim(str) {
+    // Remove leading spaces
+    while (lengthOf(str) > 0 && substring(str, 0, 1) == " ") {
+        str = substring(str, 1);
+    }
+    // Remove trailing spaces
+    len = lengthOf(str);
+    while (len > 0 && substring(str, len - 1, len) == " ") {
+        str = substring(str, 0, len - 1);
+        len = lengthOf(str);
+    }
+    return str;
+}
+
+// --- helper: merge spec for DAPI + single channel using user-defined colors ---
+function getTwoChannelMergeSpecSimple(channelIndex, dapiTitle, channelTitle, dapiColor, channelColor) {
+    // Build merge spec based on user-defined colors
+    // For composite colors, duplicate images are needed
+    mergeSpec = "";
+    dapiAssigned = false;
+    chAssigned = false;
+    
+    // Map DAPI to RGB channels (c1=red, c2=green, c3=blue, c4=gray)
+    if (dapiColor == "Red") {
+        mergeSpec = mergeSpec + "c1=[" + dapiTitle + "] ";
+        dapiAssigned = true;
+    } else if (dapiColor == "Green") {
+        mergeSpec = mergeSpec + "c2=[" + dapiTitle + "] ";
+        dapiAssigned = true;
+    } else if (dapiColor == "Blue") {
+        mergeSpec = mergeSpec + "c3=[" + dapiTitle + "] ";
+        dapiAssigned = true;
+    } else if (dapiColor == "Gray") {
+        mergeSpec = mergeSpec + "c4=[" + dapiTitle + "] ";
+        dapiAssigned = true;
+    } else if (dapiColor == "Cyan") {
+        // Green + Blue - duplicate needed
+        selectWindow(dapiTitle);
+        run("Duplicate...", "title=__TMP_DAPI_G");
+        selectWindow("__TMP_DAPI_G");
+        run("Grays");  // Ensure grayscale
+        selectWindow(dapiTitle);
+        run("Duplicate...", "title=__TMP_DAPI_B");
+        selectWindow("__TMP_DAPI_B");
+        run("Grays");  // Ensure grayscale
+        mergeSpec = mergeSpec + "c2=[__TMP_DAPI_G] c3=[__TMP_DAPI_B] ";
+        dapiAssigned = true;
+    } else if (dapiColor == "Magenta") {
+        // Red + Blue - duplicate needed
+        selectWindow(dapiTitle);
+        run("Duplicate...", "title=__TMP_DAPI_R");
+        selectWindow("__TMP_DAPI_R");
+        run("Grays");  // Ensure grayscale
+        selectWindow(dapiTitle);
+        run("Duplicate...", "title=__TMP_DAPI_B");
+        selectWindow("__TMP_DAPI_B");
+        run("Grays");  // Ensure grayscale
+        mergeSpec = mergeSpec + "c1=[__TMP_DAPI_R] c3=[__TMP_DAPI_B] ";
+        dapiAssigned = true;
+    } else if (dapiColor == "Yellow") {
+        // Red + Green - duplicate needed
+        selectWindow(dapiTitle);
+        run("Duplicate...", "title=__TMP_DAPI_R");
+        selectWindow("__TMP_DAPI_R");
+        run("Grays");  // Ensure grayscale
+        selectWindow(dapiTitle);
+        run("Duplicate...", "title=__TMP_DAPI_G");
+        selectWindow("__TMP_DAPI_G");
+        run("Grays");  // Ensure grayscale
+        mergeSpec = mergeSpec + "c1=[__TMP_DAPI_R] c2=[__TMP_DAPI_G] ";
+        dapiAssigned = true;
+    }
+    
+    // Map channel to RGB channels (avoid conflicts)
+    if (channelColor == "Red" && indexOf(mergeSpec, "c1=") < 0) {
+        mergeSpec = mergeSpec + "c1=[" + channelTitle + "] ";
+        chAssigned = true;
+    } else if (channelColor == "Green" && indexOf(mergeSpec, "c2=") < 0) {
+        mergeSpec = mergeSpec + "c2=[" + channelTitle + "] ";
+        chAssigned = true;
+    } else if (channelColor == "Blue" && indexOf(mergeSpec, "c3=") < 0) {
+        mergeSpec = mergeSpec + "c3=[" + channelTitle + "] ";
+        chAssigned = true;
+    } else if (channelColor == "Gray" && indexOf(mergeSpec, "c4=") < 0) {
+        mergeSpec = mergeSpec + "c4=[" + channelTitle + "] ";
+        chAssigned = true;
+    } else if (channelColor == "Cyan") {
+        // Green + Blue - duplicate needed
+        selectWindow(channelTitle);
+        run("Duplicate...", "title=__TMP_CH_G");
+        selectWindow("__TMP_CH_G");
+        run("Grays");  // Ensure grayscale
+        selectWindow(channelTitle);
+        run("Duplicate...", "title=__TMP_CH_B");
+        selectWindow("__TMP_CH_B");
+        run("Grays");  // Ensure grayscale
+        if (indexOf(mergeSpec, "c2=") < 0) mergeSpec = mergeSpec + "c2=[__TMP_CH_G] ";
+        if (indexOf(mergeSpec, "c3=") < 0) mergeSpec = mergeSpec + "c3=[__TMP_CH_B] ";
+        chAssigned = true;
+    } else if (channelColor == "Magenta") {
+        // Red + Blue - duplicate needed
+        selectWindow(channelTitle);
+        run("Duplicate...", "title=__TMP_CH_R");
+        selectWindow("__TMP_CH_R");
+        run("Grays");  // Ensure grayscale
+        selectWindow(channelTitle);
+        run("Duplicate...", "title=__TMP_CH_B");
+        selectWindow("__TMP_CH_B");
+        run("Grays");  // Ensure grayscale
+        if (indexOf(mergeSpec, "c1=") < 0) mergeSpec = mergeSpec + "c1=[__TMP_CH_R] ";
+        if (indexOf(mergeSpec, "c3=") < 0) mergeSpec = mergeSpec + "c3=[__TMP_CH_B] ";
+        chAssigned = true;
+    } else if (channelColor == "Yellow") {
+        // Red + Green - duplicate needed
+        selectWindow(channelTitle);
+        run("Duplicate...", "title=__TMP_CH_R");
+        selectWindow("__TMP_CH_R");
+        run("Grays");  // Ensure grayscale
+        selectWindow(channelTitle);
+        run("Duplicate...", "title=__TMP_CH_G");
+        selectWindow("__TMP_CH_G");
+        run("Grays");  // Ensure grayscale
+        if (indexOf(mergeSpec, "c1=") < 0) mergeSpec = mergeSpec + "c1=[__TMP_CH_R] ";
+        if (indexOf(mergeSpec, "c2=") < 0) mergeSpec = mergeSpec + "c2=[__TMP_CH_G] ";
+        chAssigned = true;
+    }
+    
+    return mergeSpec;
+}
+
+// --- helper: apply color LUT based on color name ---
+function applyColorLUT(colorName) {
+    if (colorName == "Red") {
+        run("Red");
+    } else if (colorName == "Green") {
+        run("Green");
+    } else if (colorName == "Blue") {
+        run("Blue");
+    } else if (colorName == "Gray") {
+        run("Grays");
+    } else if (colorName == "Cyan") {
+        run("Cyan");
+    } else if (colorName == "Magenta") {
+        run("Magenta");
+    } else if (colorName == "Yellow") {
+        run("Yellow");
+    } else {
+        // None or unknown - keep grayscale
+        run("Grays");
+    }
+}
+
+// --- helper: get file path for a given image label ---
+function getImagePathForLabel(label, base, outputDir, mergeSavePath, noDapiPath, maxChannel) {
+    label = trim(label);
+    if (label == "Merged (DAPI)" || label == "Merged") {
+        return mergeSavePath;
+    } else if (label == "DAPI") {
+        return outputDir + base + "__DAPI.jpg";
+    } else if (label == "No DAPI") {
+        return noDapiPath;
+    } else if (label == "DAPI+C2") {
+        return outputDir + base + "__DAPI_plus_C2.jpg";
+    } else if (label == "DAPI+C3") {
+        return outputDir + base + "__DAPI_plus_C3.jpg";
+    } else if (label == "DAPI+C4") {
+        return outputDir + base + "__DAPI_plus_C4.jpg";
+    } else if (label == "C2") {
+        return outputDir + base + "__C2.jpg";
+    } else if (label == "C3") {
+        return outputDir + base + "__C3.jpg";
+    } else if (label == "C4") {
+        return outputDir + base + "__C4.jpg";
+    } else if (label == "C2+C3") {
+        return outputDir + base + "__C2_C3.jpg";
+    } else if (label == "C2+C4") {
+        return outputDir + base + "__C2_C4.jpg";
+    } else if (label == "C3+C4") {
+        return outputDir + base + "__C3_C4.jpg";
+    }
+    return "";
+}
+
+

@@ -22,3 +22,9 @@ test/
 
 # Archives
 *.zip
+
+# Office documents
+*.pptx
+
+# Legacy macros
+old versions/
