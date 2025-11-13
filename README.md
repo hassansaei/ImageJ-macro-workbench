@@ -1,12 +1,12 @@
 ## ImageJ-macro-workbench
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17598285.svg)](https://doi.org/10.5281/zenodo.17598285)
+[![DOI](https://zenodo.org/badge/1094337702.svg)](https://doi.org/10.5281/zenodo.17598284)
 
 This repository hosts the `Image Analyzer` Fiji macro for batch-processing ND2, CZI, and TIFF microscopy datasets. The script automates DAPI and multi-channel exports, applies reproducible display settings, and produces figure-ready JPEG panels.
 
 **APA**
 ```
-Saei, H. (2025). ImageJ-macro-workbench (Version 1.0.0) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.17598285
+Saei, H. (2025). ImageJ-macro-workbench (Version 1.0.0) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.17598284
 ```
 
 **BibTeX**
@@ -17,8 +17,8 @@ Saei, H. (2025). ImageJ-macro-workbench (Version 1.0.0) [Computer software]. Zen
   year         = {2025},
   version      = {1.0.0},
   publisher    = {Zenodo},
-  doi          = {10.5281/zenodo.17598285},
-  url          = {https://doi.org/10.5281/zenodo.17598285}
+  doi          = {10.5281/zenodo.17600693},
+  url          = {https://doi.org/10.5281/zenodo.17598284}
 }
 ```
 
