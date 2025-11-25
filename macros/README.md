@@ -1,10 +1,10 @@
 ## Image Analyzer Macro Overview
 
-The latest macro script, `0_ImageAnalyzer_v1.2.ijm`, batch-processes ND2, CZI, and TIFF microscopy files to produce reproducible, figure-ready exports.
+The latest macro script, `0_ImageAnalyzer_v1.3.ijm`, batch-processes ND2, CZI, and TIFF microscopy files to produce reproducible, figure-ready exports.
 
 ### Key Features
 - Supports one to four fluorescence channels with automatic channel detection.
-- Generates DAPI-only images, DAPI + each channel, all pairwise composites, all three-channel combinations, and a final merged image (with or without DAPI).
+- Generates C1-only images, C1 + each channel, all pairwise composites, all three-channel combinations, and a final merged image (with or without C1).
 - Lets you select which image appears larger in the panel layout, now including every three-channel combo (e.g., `C1+C2+C3`).
 - Provides user-defined color assignment for each channel, including composite colors (Cyan, Magenta, Yellow) mapped to ImageJ’s extended merge slots to preserve color fidelity in exports.
 - Offers per-channel or global intensity controls with optional LUT baking.
@@ -14,8 +14,13 @@ The latest macro script, `0_ImageAnalyzer_v1.2.ijm`, batch-processes ND2, CZI, a
 ### Usage
 1. Run the macro from Fiji (`Plugins → Macros → Run...`).
 2. Choose the folder containing ND2, CZI, or TIFF files.
-3. Configure contrast, intensity ranges, colors, panel layout, and scale bar options in the dialog (grouped sections in v1.2 make navigation easier).
-4. Review the generated JPEGs (DAPI, DAPI+channels, pairwise and three-channel composites, merge, panel) plus the log file stored next to the source data.
+3. Configure contrast, intensity ranges, colors, panel layout, and scale bar options in the dialog (grouped sections in v1.2+ make navigation easier).
+4. Review the generated JPEGs (C1, C1+channels, pairwise and three-channel composites, merge, panel) plus the log file stored next to the source data.
+
+### What’s New in v1.3
+- Output filenames now follow the C1 naming convention (`__C1.jpg`, `__C1_C2.jpg`, `__MERGE_NO_C1.jpg`), eliminating hard-coded DAPI references.
+- The settings dialog, panel presets, and logs reference “C1” instead of “DAPI”, so the first channel can represent any stain.
+- The v1.2 macro remains available unchanged for teams that still rely on the older naming.
 
 ### What’s New in v1.2
 - Dialog reorganized with grouped headings and updated default enhance-contrast saturation (0.35) for quicker setup.
