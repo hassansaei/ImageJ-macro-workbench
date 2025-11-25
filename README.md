@@ -2,10 +2,10 @@
 
 [![DOI](https://zenodo.org/badge/1094337702.svg)](https://doi.org/10.5281/zenodo.17598284)
 
-This repository hosts the `Image Analyzer` Fiji macro for batch-processing ND2, CZI, and TIFF microscopy datasets. The script automates C1 (nuclear/reference) and multi-channel exports, applies reproducible display settings, and produces figure-ready JPEG panels.  
-**Latest release: v1.3.0** (channel-agnostic naming: DAPI references replaced by C1 in dialogs, filenames, and panel presets).
+This repository hosts the `Image Analyzer` Fiji macro for batch-processing ND2, CZI, and TIFF microscopy datasets. The script automates DAPI and multi-channel exports, applies reproducible display settings, and produces figure-ready JPEG panels.  
+**Latest release: v1.2.0** (Magenta/Cyan color fidelity, full three-channel combos, streamlined settings dialog).
 
-**APA**
+**Citation**
 ```
 Saei, H. (2025). ImageJ-macro-workbench (Version 1.3.0) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.17598284
 ```
